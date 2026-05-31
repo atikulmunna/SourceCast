@@ -41,6 +41,9 @@ class User(Base):
     ingestion_jobs: Mapped[list["IngestionJob"]] = relationship(
         "IngestionJob", back_populates="user", cascade="all, delete-orphan"
     )
+    chat_sessions: Mapped[list["ChatSession"]] = relationship(
+        "ChatSession", back_populates="user", cascade="all, delete-orphan"
+    )
 
     def __repr__(self) -> str:
         return f"<User id={self.id} email={self.email}>"
@@ -48,6 +51,7 @@ class User(Base):
 
 # Circular import avoidance — import models here so relationships resolve
 from app.models.ingestion_job import IngestionJob  # noqa: E402, F401
+from app.models.chat_session import ChatSession  # noqa: E402, F401
 from app.models.knowledge_space import KnowledgeSpace  # noqa: E402, F401
 from app.models.refresh_token import RefreshToken  # noqa: E402, F401
 from app.models.source import Source  # noqa: E402, F401

@@ -9,8 +9,11 @@ from qdrant_client.models import PointStruct
 from sqlalchemy import delete, select, text
 
 from app.core.config import settings
-from app.db.session import AsyncSessionLocal
+from app.db.session import AsyncSessionLocal, engine
 from app.models.ingestion_job import IngestionJob
+from app.models.chat_message import ChatMessage
+from app.models.chat_session import ChatSession
+from app.models.evidence_item import EvidenceItem
 from app.models.knowledge_space import KnowledgeSpace
 from app.models.source import Source
 from app.models.source_space import SourceSpace
@@ -26,6 +29,7 @@ async def db():
     async with AsyncSessionLocal() as session:
         yield session
         await session.rollback()
+    await engine.dispose()
 
 
 @pytest.mark.asyncio
@@ -159,3 +163,53 @@ async def test_qdrant_filters_tenants_and_deletes_source_vectors() -> None:
         assert user_a_results == []
     finally:
         await qdrant_service.get_client().delete_collection(collection)
+
+
+@pytest.mark.asyncio
+async def test_postgres_chat_session_delete_cascades_messages_and_evidence(db) -> None:
+    suffix = uuid.uuid4().hex[:8]
+    user = User(
+        email=f"chat-integration-{suffix}@example.com",
+        name="Chat Researcher",
+        password_hash="not-used",
+        role="USER",
+    )
+    db.add(user)
+    await db.flush()
+    space = KnowledgeSpace(user_id=user.id, name=f"Chat Integration {suffix}")
+    db.add(space)
+    await db.flush()
+    session = ChatSession(user_id=user.id, space_id=space.id, title="Evidence chat")
+    db.add(session)
+    await db.flush()
+    message = ChatMessage(
+        session_id=session.id,
+        user_id=user.id,
+        role="assistant",
+        content="Grounded answer.",
+        sequence_number=1,
+    )
+    db.add(message)
+    await db.flush()
+    evidence = EvidenceItem(
+        message_id=message.id,
+        user_id=user.id,
+        excerpt="Timestamped transcript evidence.",
+        start_time_sec=12,
+        end_time_sec=18,
+        relevance_score=0.91,
+        confidence_label="High",
+    )
+    db.add(evidence)
+    await db.commit()
+    session_id = session.id
+    message_id = message.id
+    evidence_id = evidence.id
+
+    await db.execute(delete(ChatSession).where(ChatSession.id == session_id))
+    await db.commit()
+
+    assert await db.scalar(select(ChatMessage).where(ChatMessage.id == message_id)) is None
+    assert await db.scalar(select(EvidenceItem).where(EvidenceItem.id == evidence_id)) is None
+    await db.execute(delete(User).where(User.id == user.id))
+    await db.commit()

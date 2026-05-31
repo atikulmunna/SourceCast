@@ -38,10 +38,14 @@ class KnowledgeSpace(Base):
     source_spaces: Mapped[list["SourceSpace"]] = relationship(
         "SourceSpace", back_populates="space", cascade="all, delete-orphan"
     )
+    chat_sessions: Mapped[list["ChatSession"]] = relationship(
+        "ChatSession", back_populates="space", cascade="all, delete-orphan"
+    )
 
     def __repr__(self) -> str:
         return f"<KnowledgeSpace id={self.id} name={self.name}>"
 
 
 from app.models.source_space import SourceSpace  # noqa: E402, F401
+from app.models.chat_session import ChatSession  # noqa: E402, F401
 from app.models.user import User  # noqa: E402, F401

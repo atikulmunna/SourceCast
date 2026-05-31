@@ -14,6 +14,9 @@ from alembic import context
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 import app.models.embedding_model  # noqa: F401, E402
+import app.models.chat_message  # noqa: F401, E402
+import app.models.chat_session  # noqa: F401, E402
+import app.models.evidence_item  # noqa: F401, E402
 import app.models.ingestion_job  # noqa: F401, E402
 import app.models.knowledge_space  # noqa: F401, E402
 import app.models.refresh_token  # noqa: F401, E402
