@@ -1,0 +1,160 @@
+@import url("https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap");
+@import "tailwindcss";
+
+:root {
+    --font-inter: "Inter", sans-serif;
+}
+
+/* ── Design Tokens ──────────────────────────────────────────────────────────── */
+:root {
+    --bg-primary: #09090b;
+    --bg-secondary: #0f0f14;
+    --bg-card: #13131a;
+    --bg-card-hover: #1a1a24;
+    --border: #1e1e2e;
+    --border-subtle: #16162a;
+
+    --text-primary: #f4f4f8;
+    --text-secondary: #a1a1b5;
+    --text-muted: #6b6b80;
+
+    --accent-teal: #0d9488;
+    --accent-teal-light: #14b8a6;
+    --accent-teal-glow: rgba(20, 184, 166, 0.25);
+
+    --accent-cyan: #0891b2;
+    --accent-emerald: #059669;
+    --accent-amber: #d97706;
+    --accent-rose: #e11d48;
+
+    --radius-sm: 6px;
+    --radius-md: 10px;
+    --radius-lg: 16px;
+    --radius-xl: 24px;
+}
+
+/* ── Base Reset ─────────────────────────────────────────────────────────────── */
+*,
+*::before,
+*::after {
+    box-sizing: border-box;
+}
+
+html {
+    scroll-behavior: smooth;
+}
+
+body {
+    font-family: var(--font-inter);
+    background-color: var(--bg-primary);
+    color: var(--text-primary);
+    line-height: 1.6;
+    -webkit-font-smoothing: antialiased;
+}
+
+/* ── Scrollbar ─────────────────────────────────────────────────────────────── */
+::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+}
+::-webkit-scrollbar-track {
+    background: var(--bg-secondary);
+}
+::-webkit-scrollbar-thumb {
+    background: var(--border);
+    border-radius: 3px;
+}
+::-webkit-scrollbar-thumb:hover {
+    background: #1a2e2b;
+}
+
+/* ── Selection ─────────────────────────────────────────────────────────────── */
+::selection {
+    background: var(--accent-teal-glow);
+    color: var(--text-primary);
+}
+
+/* ── Focus ─────────────────────────────────────────────────────────────────── */
+:focus-visible {
+    outline: 2px solid var(--accent-teal-light);
+    outline-offset: 2px;
+}
+
+/* ── Gradient Utilities ─────────────────────────────────────────────────────── */
+.gradient-text {
+    background: linear-gradient(135deg, #99f6e4 0%, #2dd4bf 50%, #67e8f9 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+}
+
+.gradient-border {
+    position: relative;
+}
+.gradient-border::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    padding: 1px;
+    background: linear-gradient(
+        135deg,
+        rgba(13, 148, 136, 0.4),
+        rgba(8, 145, 178, 0.2)
+    );
+    -webkit-mask:
+        linear-gradient(#fff 0 0) content-box,
+        linear-gradient(#fff 0 0);
+    -webkit-mask-composite: xor;
+    mask-composite: exclude;
+    pointer-events: none;
+}
+
+/* ── Glass Morphism ──────────────────────────────────────────────────────────── */
+.glass {
+    background: rgba(19, 19, 26, 0.8);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    border: 1px solid var(--border);
+}
+
+/* ── Animations ─────────────────────────────────────────────────────────────── */
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+        transform: translateY(8px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+@keyframes slideInLeft {
+    from {
+        opacity: 0;
+        transform: translateX(-16px);
+    }
+    to {
+        opacity: 1;
+        transform: translateX(0);
+    }
+}
+@keyframes pulse-glow {
+    0%,
+    100% {
+        box-shadow: 0 0 0 0 var(--accent-teal-glow);
+    }
+    50% {
+        box-shadow: 0 0 24px 4px var(--accent-teal-glow);
+    }
+}
+
+.animate-fade-in {
+    animation: fadeIn 0.3s ease forwards;
+}
+.animate-slide-in {
+    animation: slideInLeft 0.25s ease forwards;
+}
+.animate-pulse-glow {
+    animation: pulse-glow 2s ease-in-out infinite;
+}
