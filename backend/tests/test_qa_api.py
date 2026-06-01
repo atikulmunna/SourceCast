@@ -1,5 +1,4 @@
 import uuid
-from decimal import Decimal
 from types import SimpleNamespace
 
 import pytest
@@ -7,7 +6,7 @@ import pytest
 from app.api.v1 import qa
 from app.core.exceptions import ForbiddenException, NotFoundException
 from app.schemas.qa import AskQuestionRequest
-from app.services.retrieval_service import RetrievalResult
+from app.schemas.qa import AskQuestionResponse
 
 
 class ScalarResult:
@@ -38,14 +37,18 @@ def current_user():
 
 @pytest.mark.asyncio
 async def test_ask_question_returns_no_evidence_refusal(monkeypatch: pytest.MonkeyPatch) -> None:
-    class FakeRetrieval:
+    class FakeAnswerService:
         def __init__(self, user_id):
             self.user_id = user_id
 
-        async def search(self, **kwargs):
-            return []
+        async def answer(self, **kwargs):
+            return AskQuestionResponse(
+                answer="I could not find enough support.",
+                evidence=[],
+                insufficient_evidence=True,
+            )
 
-    monkeypatch.setattr(qa, "RetrievalService", FakeRetrieval)
+    monkeypatch.setattr(qa, "GroundedAnswerService", FakeAnswerService)
 
     response = await qa.ask_question(
         AskQuestionRequest(question="What does this source say?", source_ids=None),
@@ -62,25 +65,17 @@ async def test_ask_question_returns_no_evidence_refusal(monkeypatch: pytest.Monk
 async def test_ask_question_returns_short_evidence_cards(monkeypatch: pytest.MonkeyPatch) -> None:
     source_id = uuid.uuid4()
 
-    class FakeRetrieval:
+    class FakeAnswerService:
         def __init__(self, user_id):
             self.user_id = user_id
 
-        async def search(self, **kwargs):
-            return [
-                RetrievalResult(
-                    chunk_id=uuid.uuid4(),
-                    source_id=source_id,
-                    space_id=None,
-                    score=0.82,
-                    start_time_sec=Decimal("10"),
-                    end_time_sec=Decimal("20"),
-                    text="word " * 200,
-                    source_title="Interview",
-                )
-            ]
+        async def answer(self, **kwargs):
+            return AskQuestionResponse(
+                answer="Grounded provider answer. [E1]",
+                evidence=[],
+            )
 
-    monkeypatch.setattr(qa, "RetrievalService", FakeRetrieval)
+    monkeypatch.setattr(qa, "GroundedAnswerService", FakeAnswerService)
     user = current_user()
 
     response = await qa.ask_question(
@@ -90,9 +85,7 @@ async def test_ask_question_returns_short_evidence_cards(monkeypatch: pytest.Mon
     )
 
     assert response.insufficient_evidence is False
-    assert response.evidence[0].confidence_label == "High"
-    assert len(response.evidence[0].excerpt) <= 500
-    assert "Interview" in response.answer
+    assert response.answer == "Grounded provider answer. [E1]"
 
 
 @pytest.mark.asyncio
@@ -113,4 +106,3 @@ async def test_ask_question_rejects_foreign_source() -> None:
             current_user(),
             FakeDB([]),
         )
-

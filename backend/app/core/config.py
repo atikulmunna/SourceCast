@@ -47,6 +47,10 @@ class Settings(BaseSettings):
 
     # ── AI / RAG ──────────────────────────────────────────────────────────────
     GROQ_API_KEY: str = ""
+    GROQ_BASE_URL: str = "https://api.groq.com/openai/v1"
+    LLM_PROVIDER: Literal["extractive", "groq"] = "extractive"
+    LLM_MODEL: str = "llama-3.1-8b-instant"
+    LLM_TIMEOUT_SECONDS: int = 30
     DEFAULT_EMBEDDING_MODEL: str = "all-MiniLM-L6-v2"
     DEFAULT_QDRANT_COLLECTION: str = "source_chunks_v1_minilm_384"
     WHISPER_MODEL: str = "base"

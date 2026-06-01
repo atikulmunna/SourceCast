@@ -30,3 +30,8 @@ class UnprocessableException(HTTPException):
         super().__init__(
             status_code=status.HTTP_422_UNPROCESSABLE_CONTENT, detail=detail
         )
+
+
+class UpstreamServiceException(HTTPException):
+    def __init__(self, detail: str = "Upstream service unavailable"):
+        super().__init__(status_code=status.HTTP_502_BAD_GATEWAY, detail=detail)
