@@ -127,6 +127,42 @@ export interface AskQuestionResponse {
   insufficient_evidence: boolean;
 }
 
+export interface ChatSession {
+  id: string;
+  user_id: string;
+  space_id: string;
+  title: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface ChatEvidence {
+  id: string;
+  message_id: string;
+  user_id: string;
+  source_id: string | null;
+  chunk_id: string | null;
+  claim_text: string | null;
+  excerpt: string;
+  source_title: string | null;
+  start_time_sec: string;
+  end_time_sec: string;
+  relevance_score: string | null;
+  confidence_label: "High" | "Medium" | "Low" | "Insufficient";
+  created_at: string;
+}
+
+export interface ChatMessage {
+  id: string;
+  session_id: string;
+  user_id: string;
+  role: string;
+  content: string;
+  sequence_number: number;
+  created_at: string;
+  evidence: ChatEvidence[];
+}
+
 // ── API error shape from FastAPI ───────────────────────────────────────────────
 export interface ApiError {
   detail: string | { msg: string; type: string }[];
