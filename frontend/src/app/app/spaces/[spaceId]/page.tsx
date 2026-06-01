@@ -10,6 +10,7 @@ import api from "@/lib/api";
 import { KnowledgeSpace, Source, SourceIngestResponse } from "@/lib/types";
 import { SourcePreviewModal } from "@/components/sources/SourcePreviewModal";
 import { JobProgressPanel } from "@/components/jobs/JobProgressPanel";
+import { SpaceChatPanel } from "@/components/spaces/SpaceChatPanel";
 
 export default function SpaceDetailPage() {
   const { spaceId } = useParams<{ spaceId: string }>();
@@ -133,6 +134,11 @@ export default function SpaceDetailPage() {
           </div>
         )}
       </section>
+
+      <SpaceChatPanel
+        spaceId={spaceId}
+        enabled={sources.some((source) => source.status === "READY" && source.indexing_status === "INDEXED")}
+      />
 
       <SourcePreviewModal
         open={showAddSource}
