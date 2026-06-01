@@ -1,10 +1,19 @@
+import json
 import uuid
 
 from fastapi import APIRouter, status
+from fastapi.responses import StreamingResponse
 
 from app.api.deps import CurrentUser, DBDep
-from app.schemas.chat import ChatMessageCreate, ChatMessageOut, ChatSessionCreate, ChatSessionOut
+from app.schemas.chat import (
+    ChatMessageCreate,
+    ChatMessageOut,
+    ChatSessionCreate,
+    ChatSessionOut,
+    ChatTurnRequest,
+)
 from app.services.chat_service import ChatService
+from app.services.streamed_chat_service import StreamedChatService
 
 router = APIRouter(prefix="/chat", tags=["chat"])
 
@@ -47,3 +56,42 @@ async def add_message(
 ):
     return await ChatService(db).add_message(current_user.id, session_id, data)
 
+
+def _sse(event: str, data: dict) -> str:
+    return f"event: {event}\ndata: {json.dumps(data, default=str)}\n\n"
+
+
+@router.post("/sessions/{session_id}/ask")
+async def ask_session(
+    session_id: uuid.UUID,
+    data: ChatTurnRequest,
+    current_user: CurrentUser,
+    db: DBDep,
+) -> StreamingResponse:
+    async def event_generator():
+        yield _sse("chat.started", {"event": "chat.started", "session_id": str(session_id)})
+        turn = await StreamedChatService(db).answer(current_user.id, session_id, data)
+        yield _sse(
+            "chat.delta",
+            {
+                "event": "chat.delta",
+                "session_id": str(session_id),
+                "content": turn.assistant_message.content,
+            },
+        )
+        yield _sse(
+            "chat.completed",
+            {
+                "event": "chat.completed",
+                "session_id": str(session_id),
+                "user_message": turn.user_message.model_dump(mode="json"),
+                "assistant_message": turn.assistant_message.model_dump(mode="json"),
+                "insufficient_evidence": turn.insufficient_evidence,
+            },
+        )
+
+    return StreamingResponse(
+        event_generator(),
+        media_type="text/event-stream",
+        headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
+    )

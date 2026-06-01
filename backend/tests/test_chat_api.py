@@ -1,10 +1,13 @@
 import uuid
+import json
+from datetime import datetime, timezone
 from types import SimpleNamespace
 
 import pytest
 
 from app.api.v1 import chat
-from app.schemas.chat import ChatMessageCreate, ChatSessionCreate
+from app.schemas.chat import ChatMessageCreate, ChatMessageOut, ChatSessionCreate, ChatTurnRequest
+from app.services.streamed_chat_service import CompletedChatTurn
 
 
 class FakeChatService:
@@ -68,3 +71,58 @@ async def test_chat_routes_delegate_authenticated_user_scope() -> None:
         "delete_session",
     ]
     assert all(call[1] == user.id for call in FakeChatService.calls)
+
+
+@pytest.mark.asyncio
+async def test_ask_session_streams_answer_and_persisted_messages(monkeypatch) -> None:
+    user = SimpleNamespace(id=uuid.uuid4())
+    session_id = uuid.uuid4()
+    now = datetime.now(timezone.utc)
+    user_message = ChatMessageOut(
+        id=uuid.uuid4(),
+        session_id=session_id,
+        user_id=user.id,
+        role="user",
+        content="What happened?",
+        sequence_number=1,
+        created_at=now,
+    )
+    assistant_message = ChatMessageOut(
+        id=uuid.uuid4(),
+        session_id=session_id,
+        user_id=user.id,
+        role="assistant",
+        content="Grounded answer.",
+        sequence_number=2,
+        created_at=now,
+    )
+
+    class FakeStreamedChatService:
+        def __init__(self, db):
+            self.db = db
+
+        async def answer(self, user_id, requested_session_id, data):
+            assert user_id == user.id
+            assert requested_session_id == session_id
+            assert data.question == "What happened?"
+            return CompletedChatTurn(user_message, assistant_message, False)
+
+    monkeypatch.setattr(chat, "StreamedChatService", FakeStreamedChatService)
+    response = await chat.ask_session(
+        session_id,
+        ChatTurnRequest(question="What happened?"),
+        user,
+        object(),
+    )
+    events = []
+    async for chunk in response.body_iterator:
+        lines = chunk.strip().splitlines()
+        events.append((lines[0].removeprefix("event: "), json.loads(lines[1][6:])))
+
+    assert [event[0] for event in events] == [
+        "chat.started",
+        "chat.delta",
+        "chat.completed",
+    ]
+    assert events[1][1]["content"] == "Grounded answer."
+    assert events[2][1]["assistant_message"]["id"] == str(assistant_message.id)

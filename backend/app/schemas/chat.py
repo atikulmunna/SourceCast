@@ -55,6 +55,12 @@ class ChatMessageCreate(BaseModel):
     evidence: list[EvidenceCreate] = Field(default_factory=list)
 
 
+class ChatTurnRequest(BaseModel):
+    question: str = Field(min_length=3, max_length=1000)
+    source_ids: list[uuid.UUID] | None = None
+    limit: int = Field(default=5, ge=1, le=12)
+
+
 class ChatMessageOut(BaseModel):
     model_config = {"from_attributes": True}
 
