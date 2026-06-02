@@ -4,8 +4,9 @@ import { FormEvent, useState } from "react";
 import { Clock, ExternalLink, GitCompareArrows, Loader2 } from "lucide-react";
 import api from "@/lib/api";
 import { ComparisonResponse, EvidenceHit, Source, getErrorMessage } from "@/lib/types";
+import { SaveInsightButton } from "@/components/insights/SaveInsightButton";
 
-export function SourceComparisonPanel({ sources }: { sources: Source[] }) {
+export function SourceComparisonPanel({ sources, spaceId }: { sources: Source[]; spaceId: string }) {
   const readySources = sources.filter(
     (source) => source.status === "READY" && source.indexing_status === "INDEXED"
   );
@@ -108,7 +109,10 @@ export function SourceComparisonPanel({ sources }: { sources: Source[] }) {
       {comparison && (
         <div className="mt-4 space-y-4">
           <div className="rounded-lg p-4" style={{ background: "var(--bg-card)", border: "1px solid var(--border)" }}>
-            <p className="text-sm leading-relaxed">{comparison.answer}</p>
+            <div className="flex items-start gap-2">
+              <p className="text-sm leading-relaxed flex-1">{comparison.answer}</p>
+              <SaveInsightButton spaceId={spaceId} content={comparison.answer} title={`Comparison: ${comparison.topic}`} />
+            </div>
           </div>
           <div className="grid gap-4 lg:grid-cols-2">
             {comparison.sources.map((source) => (
@@ -120,7 +124,7 @@ export function SourceComparisonPanel({ sources }: { sources: Source[] }) {
                   </p>
                 ) : (
                   <div className="space-y-2">
-                    {source.evidence.map((item) => <EvidenceRow key={item.chunk_id} item={item} />)}
+                    {source.evidence.map((item) => <EvidenceRow key={item.chunk_id} item={item} spaceId={spaceId} />)}
                   </div>
                 )}
               </div>
@@ -132,7 +136,7 @@ export function SourceComparisonPanel({ sources }: { sources: Source[] }) {
   );
 }
 
-function EvidenceRow({ item }: { item: EvidenceHit }) {
+function EvidenceRow({ item, spaceId }: { item: EvidenceHit; spaceId: string }) {
   return (
     <div className="rounded-lg p-3" style={{ background: "var(--bg-secondary)", border: "1px solid var(--border)" }}>
       <div className="flex items-center justify-between gap-2 mb-1 text-xs">
@@ -149,7 +153,10 @@ function EvidenceRow({ item }: { item: EvidenceHit }) {
         </span>
         <span style={{ color: "var(--text-muted)" }}>{item.confidence_label}</span>
       </div>
-      <p className="text-xs leading-relaxed" style={{ color: "var(--text-secondary)" }}>{item.excerpt}</p>
+      <div className="flex items-start gap-2">
+        <p className="text-xs leading-relaxed flex-1" style={{ color: "var(--text-secondary)" }}>{item.excerpt}</p>
+        <SaveInsightButton spaceId={spaceId} content={item.excerpt} title={item.source_title} sourceId={item.source_id} />
+      </div>
     </div>
   );
 }

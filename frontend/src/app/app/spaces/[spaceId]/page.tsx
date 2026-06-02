@@ -12,6 +12,7 @@ import { SourcePreviewModal } from "@/components/sources/SourcePreviewModal";
 import { JobProgressPanel } from "@/components/jobs/JobProgressPanel";
 import { SpaceChatPanel } from "@/components/spaces/SpaceChatPanel";
 import { SourceComparisonPanel } from "@/components/spaces/SourceComparisonPanel";
+import { SavedInsightsPanel } from "@/components/insights/SavedInsightsPanel";
 
 export default function SpaceDetailPage() {
   const { spaceId } = useParams<{ spaceId: string }>();
@@ -141,7 +142,9 @@ export default function SpaceDetailPage() {
         enabled={sources.some((source) => source.status === "READY" && source.indexing_status === "INDEXED")}
       />
 
-      <SourceComparisonPanel sources={sources} />
+      <SourceComparisonPanel sources={sources} spaceId={spaceId} />
+
+      <SavedInsightsPanel spaceId={spaceId} />
 
       <SourcePreviewModal
         open={showAddSource}

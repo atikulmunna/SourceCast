@@ -5,6 +5,7 @@ import { Clock, ExternalLink, Loader2, MessageSquare, Send } from "lucide-react"
 import api from "@/lib/api";
 import { streamChatTurn } from "@/lib/chatSse";
 import { ChatMessage, ChatSession, getErrorMessage } from "@/lib/types";
+import { SaveInsightButton } from "@/components/insights/SaveInsightButton";
 
 interface SpaceChatPanelProps {
   spaceId: string;
@@ -79,7 +80,7 @@ export function SpaceChatPanel({ spaceId, enabled }: SpaceChatPanelProps) {
                 : "Add and index a source before starting a research chat."}
             </p>
           ) : (
-            messages.map((message) => <ChatBubble key={message.id} message={message} />)
+            messages.map((message) => <ChatBubble key={message.id} message={message} spaceId={spaceId} />)
           )}
           {streamedAnswer && (
             <div className="max-w-3xl">
@@ -124,7 +125,7 @@ export function SpaceChatPanel({ spaceId, enabled }: SpaceChatPanelProps) {
   );
 }
 
-function ChatBubble({ message }: { message: ChatMessage }) {
+function ChatBubble({ message, spaceId }: { message: ChatMessage; spaceId: string }) {
   const isUser = message.role === "user";
   return (
     <div className={isUser ? "flex justify-end" : "max-w-3xl"}>
@@ -132,7 +133,10 @@ function ChatBubble({ message }: { message: ChatMessage }) {
         className={isUser ? "rounded-lg px-3 py-2 max-w-xl" : ""}
         style={isUser ? { background: "rgba(13,148,136,0.14)" } : undefined}
       >
-        <p className="text-sm leading-relaxed">{message.content}</p>
+        <div className="flex items-start gap-2">
+          <p className="text-sm leading-relaxed flex-1">{message.content}</p>
+          {!isUser && <SaveInsightButton spaceId={spaceId} content={message.content} title="Chat answer" />}
+        </div>
         {message.evidence.length > 0 && (
           <div className="mt-3 grid gap-2">
             {message.evidence.map((item) => (
@@ -162,7 +166,16 @@ function ChatBubble({ message }: { message: ChatMessage }) {
                   <span style={{ color: "var(--text-muted)" }}>{item.confidence_label}</span>
                 </div>
                 {item.source_title && <p className="text-xs font-medium mb-1">{item.source_title}</p>}
-                <p className="text-xs leading-relaxed" style={{ color: "var(--text-secondary)" }}>{item.excerpt}</p>
+                <div className="flex items-start gap-2">
+                  <p className="text-xs leading-relaxed flex-1" style={{ color: "var(--text-secondary)" }}>{item.excerpt}</p>
+                  <SaveInsightButton
+                    spaceId={spaceId}
+                    content={item.excerpt}
+                    title={item.source_title}
+                    sourceId={item.source_id}
+                    evidenceItemId={item.id}
+                  />
+                </div>
               </div>
             ))}
           </div>

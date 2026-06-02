@@ -142,6 +142,19 @@ export interface ComparisonResponse {
   insufficient_source_ids: string[];
 }
 
+export interface SavedInsight {
+  id: string;
+  user_id: string;
+  space_id: string;
+  source_id: string | null;
+  evidence_item_id: string | null;
+  title: string | null;
+  content: string;
+  tags: string[];
+  created_at: string;
+  updated_at: string;
+}
+
 export interface ChatSession {
   id: string;
   user_id: string;
