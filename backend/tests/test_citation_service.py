@@ -1,6 +1,10 @@
 from decimal import Decimal
+from types import SimpleNamespace
+import uuid
 
-from app.services.citation_service import build_timestamp_url
+import pytest
+
+from app.services.citation_service import add_navigation_urls, build_timestamp_url
 
 
 def test_youtube_timestamp_url_preserves_existing_query_parameters() -> None:
@@ -30,3 +34,49 @@ def test_non_youtube_url_is_preserved() -> None:
 
 def test_missing_source_url_has_no_navigation_target() -> None:
     assert build_timestamp_url(None, "youtube", 42) is None
+
+
+class Result:
+    def __init__(self, sources):
+        self.sources = sources
+
+    def scalars(self):
+        return self
+
+    def all(self):
+        return self.sources
+
+
+class DB:
+    def __init__(self, sources):
+        self.sources = sources
+
+    async def execute(self, statement):
+        return Result(self.sources)
+
+
+@pytest.mark.asyncio
+async def test_add_navigation_urls_enriches_known_owned_sources() -> None:
+    source_id = uuid.uuid4()
+    evidence = SimpleNamespace(
+        source_id=source_id,
+        start_time_sec=Decimal("75.2"),
+        navigation_url=None,
+    )
+    source = SimpleNamespace(
+        id=source_id,
+        source_type="youtube",
+        source_url="https://youtu.be/abc123",
+        canonical_url=None,
+    )
+
+    assert await add_navigation_urls(DB([source]), uuid.uuid4(), [evidence]) == [evidence]
+    assert evidence.navigation_url == "https://youtu.be/abc123?t=75"
+
+
+@pytest.mark.asyncio
+async def test_add_navigation_urls_skips_lookup_without_source_ids() -> None:
+    evidence = SimpleNamespace(source_id=None, navigation_url=None)
+
+    assert await add_navigation_urls(None, uuid.uuid4(), [evidence]) == [evidence]
+    assert evidence.navigation_url is None

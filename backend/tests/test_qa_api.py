@@ -6,7 +6,7 @@ import pytest
 from app.api.v1 import qa
 from app.core.exceptions import ForbiddenException, NotFoundException
 from app.schemas.qa import AskQuestionRequest
-from app.schemas.qa import AskQuestionResponse
+from app.schemas.qa import AskQuestionResponse, EvidenceHit
 
 
 class ScalarResult:
@@ -72,10 +72,26 @@ async def test_ask_question_returns_short_evidence_cards(monkeypatch: pytest.Mon
         async def answer(self, **kwargs):
             return AskQuestionResponse(
                 answer="Grounded provider answer. [E1]",
-                evidence=[],
+                evidence=[
+                    EvidenceHit(
+                        chunk_id=uuid.uuid4(),
+                        source_id=source_id,
+                        space_id=None,
+                        source_title="Interview",
+                        start_time_sec=12,
+                        end_time_sec=18,
+                        excerpt="Short evidence.",
+                        score=0.9,
+                        confidence_label="High",
+                    )
+                ],
             )
 
     monkeypatch.setattr(qa, "GroundedAnswerService", FakeAnswerService)
+    async def add_urls(db, user_id, evidence):
+        evidence[0].navigation_url = "https://youtu.be/abc123?t=12"
+
+    monkeypatch.setattr(qa, "add_navigation_urls", add_urls)
     user = current_user()
 
     response = await qa.ask_question(
@@ -86,6 +102,7 @@ async def test_ask_question_returns_short_evidence_cards(monkeypatch: pytest.Mon
 
     assert response.insufficient_evidence is False
     assert response.answer == "Grounded provider answer. [E1]"
+    assert response.evidence[0].navigation_url == "https://youtu.be/abc123?t=12"
 
 
 @pytest.mark.asyncio

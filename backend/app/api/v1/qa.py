@@ -10,6 +10,7 @@ from app.core.exceptions import ForbiddenException, NotFoundException
 from app.models.knowledge_space import KnowledgeSpace
 from app.models.source import Source
 from app.schemas.qa import AskQuestionRequest, AskQuestionResponse
+from app.services.citation_service import add_navigation_urls
 from app.services.grounded_answer_service import GroundedAnswerService
 
 router = APIRouter(prefix="/qa", tags=["qa"])
@@ -51,9 +52,11 @@ async def ask_question(
     if data.source_ids:
         await _assert_source_owners(db, current_user.id, data.source_ids)
 
-    return await GroundedAnswerService(user_id=current_user.id).answer(
+    response = await GroundedAnswerService(user_id=current_user.id).answer(
         question=data.question,
         space_id=data.space_id,
         source_ids=data.source_ids,
         limit=data.limit,
     )
+    await add_navigation_urls(db, current_user.id, response.evidence)
+    return response

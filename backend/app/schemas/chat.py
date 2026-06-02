@@ -47,6 +47,7 @@ class EvidenceOut(EvidenceCreate):
     message_id: uuid.UUID
     user_id: uuid.UUID
     created_at: datetime
+    navigation_url: str | None = None
 
 
 class ChatMessageCreate(BaseModel):

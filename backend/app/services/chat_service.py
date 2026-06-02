@@ -8,7 +8,14 @@ from app.models.chat_message import ChatMessage
 from app.models.chat_session import ChatSession
 from app.models.evidence_item import EvidenceItem
 from app.models.knowledge_space import KnowledgeSpace
-from app.schemas.chat import ChatMessageCreate, ChatMessageOut, ChatSessionCreate, ChatSessionOut
+from app.schemas.chat import (
+    ChatMessageCreate,
+    ChatMessageOut,
+    ChatSessionCreate,
+    ChatSessionOut,
+    EvidenceOut,
+)
+from app.services.citation_service import add_navigation_urls
 
 
 class ChatService:
@@ -94,7 +101,11 @@ class ChatService:
             .where(EvidenceItem.message_id == message.id)
             .order_by(EvidenceItem.created_at)
         )
-        evidence = result.scalars().all()
+        evidence = [
+            EvidenceOut.model_validate(item)
+            for item in result.scalars().all()
+        ]
+        await add_navigation_urls(self.db, message.user_id, evidence)
         return ChatMessageOut(
             id=message.id,
             session_id=message.session_id,
@@ -123,4 +134,3 @@ class ChatService:
         if space.user_id != user_id:
             raise ForbiddenException("You do not own this space")
         return space
-

@@ -1,5 +1,6 @@
 import uuid
 from datetime import datetime, timezone
+from types import SimpleNamespace
 
 import pytest
 from pydantic import ValidationError
@@ -7,6 +8,7 @@ from pydantic import ValidationError
 from app.core.exceptions import ForbiddenException, NotFoundException, UnprocessableException
 from app.models.chat_session import ChatSession
 from app.models.knowledge_space import KnowledgeSpace
+from app.models.source import Source
 from app.schemas.chat import ChatMessageCreate, ChatSessionCreate, EvidenceCreate
 from app.services.chat_service import ChatService
 
@@ -191,3 +193,47 @@ async def test_add_assistant_message_persists_normalized_evidence() -> None:
     assert len(stored_evidence) == 1
     assert stored_evidence[0].message_id == message.id
     assert stored_evidence[0].user_id == user_id
+
+
+@pytest.mark.asyncio
+async def test_list_messages_adds_navigation_url_to_persisted_evidence() -> None:
+    user_id = uuid.uuid4()
+    chat = session(user_id, uuid.uuid4())
+    now = datetime.now(timezone.utc)
+    source = Source(
+        id=uuid.uuid4(),
+        user_id=user_id,
+        source_type="youtube",
+        source_url="https://youtu.be/abc123",
+        canonical_url=None,
+    )
+    message = SimpleNamespace(
+        id=uuid.uuid4(),
+        session_id=chat.id,
+        user_id=user_id,
+        role="assistant",
+        content="Grounded answer.",
+        sequence_number=2,
+        created_at=now,
+    )
+    evidence = SimpleNamespace(
+        id=uuid.uuid4(),
+        message_id=message.id,
+        user_id=user_id,
+        source_id=source.id,
+        chunk_id=None,
+        claim_text=None,
+        excerpt="Short evidence.",
+        source_title="Interview",
+        start_time_sec=12,
+        end_time_sec=18,
+        relevance_score=0.9,
+        confidence_label="High",
+        created_at=now,
+    )
+
+    messages = await ChatService(FakeDB(chat, [message], [evidence], [source])).list_messages(
+        user_id, chat.id
+    )
+
+    assert messages[0].evidence[0].navigation_url == "https://youtu.be/abc123?t=12"

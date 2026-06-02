@@ -23,10 +23,10 @@ class EvidenceHit(BaseModel):
     excerpt: str
     score: float
     confidence_label: str
+    navigation_url: str | None = None
 
 
 class AskQuestionResponse(BaseModel):
     answer: str
     evidence: list[EvidenceHit]
     insufficient_evidence: bool = False
-
