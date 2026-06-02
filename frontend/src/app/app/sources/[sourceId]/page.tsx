@@ -235,9 +235,23 @@ export default function SourceDetailPage() {
                 {answer.evidence.map((item) => (
                   <div key={item.chunk_id} className="rounded-lg p-3" style={{ background: "var(--bg-secondary)", border: "1px solid var(--border)" }}>
                     <div className="flex items-center justify-between gap-2 mb-2">
-                      <span className="text-xs font-medium" style={{ color: "#2dd4bf" }}>
-                        {formatTimestamp(Number(item.start_time_sec))} - {formatTimestamp(Number(item.end_time_sec))}
-                      </span>
+                      <div className="flex items-center gap-2">
+                        <span className="text-xs font-medium" style={{ color: "#2dd4bf" }}>
+                          {formatTimestamp(Number(item.start_time_sec))} - {formatTimestamp(Number(item.end_time_sec))}
+                        </span>
+                        {item.navigation_url && (
+                          <a
+                            href={item.navigation_url}
+                            target="_blank"
+                            rel="noreferrer"
+                            title="Open source at timestamp"
+                            className="hover:opacity-80"
+                            style={{ color: "#2dd4bf" }}
+                          >
+                            <ExternalLink size={13} />
+                          </a>
+                        )}
+                      </div>
                       <span className="text-xs" style={{ color: "var(--text-muted)" }}>
                         {item.confidence_label}
                       </span>

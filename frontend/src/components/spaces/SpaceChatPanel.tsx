@@ -1,7 +1,7 @@
 "use client";
 
 import { FormEvent, useState } from "react";
-import { Clock, Loader2, MessageSquare, Send } from "lucide-react";
+import { Clock, ExternalLink, Loader2, MessageSquare, Send } from "lucide-react";
 import api from "@/lib/api";
 import { streamChatTurn } from "@/lib/chatSse";
 import { ChatMessage, ChatSession, getErrorMessage } from "@/lib/types";
@@ -142,9 +142,22 @@ function ChatBubble({ message }: { message: ChatMessage }) {
                 style={{ background: "var(--bg-secondary)", border: "1px solid var(--border)" }}
               >
                 <div className="flex items-center justify-between gap-2 mb-1 text-xs">
-                  <span className="flex items-center gap-1" style={{ color: "#2dd4bf" }}>
-                    <Clock size={12} />
-                    {formatTimestamp(Number(item.start_time_sec))} - {formatTimestamp(Number(item.end_time_sec))}
+                  <span className="flex items-center gap-2" style={{ color: "#2dd4bf" }}>
+                    <span className="flex items-center gap-1">
+                      <Clock size={12} />
+                      {formatTimestamp(Number(item.start_time_sec))} - {formatTimestamp(Number(item.end_time_sec))}
+                    </span>
+                    {item.navigation_url && (
+                      <a
+                        href={item.navigation_url}
+                        target="_blank"
+                        rel="noreferrer"
+                        title="Open source at timestamp"
+                        className="hover:opacity-80"
+                      >
+                        <ExternalLink size={12} />
+                      </a>
+                    )}
                   </span>
                   <span style={{ color: "var(--text-muted)" }}>{item.confidence_label}</span>
                 </div>

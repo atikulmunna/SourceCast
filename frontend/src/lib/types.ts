@@ -119,6 +119,7 @@ export interface EvidenceHit {
   excerpt: string;
   score: number;
   confidence_label: "High" | "Medium" | "Low" | string;
+  navigation_url: string | null;
 }
 
 export interface AskQuestionResponse {
@@ -150,6 +151,7 @@ export interface ChatEvidence {
   relevance_score: string | null;
   confidence_label: "High" | "Medium" | "Low" | "Insufficient";
   created_at: string;
+  navigation_url: string | null;
 }
 
 export interface ChatMessage {
