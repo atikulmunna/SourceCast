@@ -11,6 +11,7 @@ import { KnowledgeSpace, Source, SourceIngestResponse } from "@/lib/types";
 import { SourcePreviewModal } from "@/components/sources/SourcePreviewModal";
 import { JobProgressPanel } from "@/components/jobs/JobProgressPanel";
 import { SpaceChatPanel } from "@/components/spaces/SpaceChatPanel";
+import { SourceComparisonPanel } from "@/components/spaces/SourceComparisonPanel";
 
 export default function SpaceDetailPage() {
   const { spaceId } = useParams<{ spaceId: string }>();
@@ -139,6 +140,8 @@ export default function SpaceDetailPage() {
         spaceId={spaceId}
         enabled={sources.some((source) => source.status === "READY" && source.indexing_status === "INDEXED")}
       />
+
+      <SourceComparisonPanel sources={sources} />
 
       <SourcePreviewModal
         open={showAddSource}

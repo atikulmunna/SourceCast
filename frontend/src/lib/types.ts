@@ -128,6 +128,20 @@ export interface AskQuestionResponse {
   insufficient_evidence: boolean;
 }
 
+export interface SourceComparison {
+  source_id: string;
+  source_title: string | null;
+  evidence: EvidenceHit[];
+  insufficient_evidence: boolean;
+}
+
+export interface ComparisonResponse {
+  topic: string;
+  answer: string;
+  sources: SourceComparison[];
+  insufficient_source_ids: string[];
+}
+
 export interface ChatSession {
   id: string;
   user_id: string;
