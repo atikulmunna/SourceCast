@@ -8,6 +8,7 @@ from app.services.comparison_service import (
     ComparisonSource,
     NO_COMPARISON_EVIDENCE,
 )
+from app.services.llm_provider import ExtractiveAnswerProvider
 from app.services.retrieval_service import RetrievalResult
 
 
@@ -82,3 +83,25 @@ async def test_compare_refuses_and_skips_provider_without_any_evidence() -> None
     assert response.answer == NO_COMPARISON_EVIDENCE
     assert response.insufficient_source_ids == [source_id]
     assert provider.calls == []
+
+
+@pytest.mark.asyncio
+async def test_compare_builds_honest_grouped_answer_in_local_extractive_mode() -> None:
+    first_id = uuid.uuid4()
+    second_id = uuid.uuid4()
+
+    response = await ComparisonService(
+        uuid.uuid4(),
+        retrieval=Retrieval({first_id: [hit(first_id)]}),
+        provider=ExtractiveAnswerProvider(),
+    ).compare(
+        "Sleep quality",
+        [
+            ComparisonSource(first_id, "First interview"),
+            ComparisonSource(second_id, "Second interview"),
+        ],
+    )
+
+    assert "First interview: review the cited transcript evidence [E1]." in response.answer
+    assert "Second interview: insufficient evidence" in response.answer
+    assert "No supported agreement or difference is asserted" in response.answer

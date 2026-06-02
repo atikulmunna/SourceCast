@@ -7,7 +7,7 @@ from app.schemas.comparison import ComparisonResponse, SourceComparison
 from app.schemas.qa import EvidenceHit
 from app.services.comparison_prompt_service import build_comparison_messages
 from app.services.grounded_answer_service import confidence_label, excerpt
-from app.services.llm_provider import AnswerProvider, get_answer_provider
+from app.services.llm_provider import AnswerProvider, ExtractiveAnswerProvider, get_answer_provider
 from app.services.retrieval_service import RetrievalService
 
 NO_COMPARISON_EVIDENCE = (
@@ -82,13 +82,36 @@ class ComparisonService:
                 insufficient_source_ids=insufficient_source_ids,
             )
 
-        answer = await self.provider.generate(
-            build_comparison_messages(topic, source_results),
-            all_evidence,
-        )
+        if isinstance(self.provider, ExtractiveAnswerProvider):
+            answer = build_extractive_comparison_answer(source_results)
+        else:
+            answer = await self.provider.generate(
+                build_comparison_messages(topic, source_results),
+                all_evidence,
+            )
         return ComparisonResponse(
             topic=topic,
             answer=answer,
             sources=source_results,
             insufficient_source_ids=insufficient_source_ids,
         )
+
+
+def build_extractive_comparison_answer(sources: list[SourceComparison]) -> str:
+    lines = ["Source-by-source evidence:"]
+    evidence_index = 1
+    for source in sources:
+        title = source.source_title or "Untitled source"
+        if source.insufficient_evidence:
+            lines.append(f"- {title}: insufficient evidence for this topic.")
+            continue
+        citations = []
+        for _ in source.evidence:
+            citations.append(f"[E{evidence_index}]")
+            evidence_index += 1
+        lines.append(f"- {title}: review the cited transcript evidence {' '.join(citations)}.")
+    lines.append(
+        "No supported agreement or difference is asserted in local extractive mode. "
+        "Review the grouped evidence cards for the source wording."
+    )
+    return "\n".join(lines)
