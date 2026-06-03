@@ -154,6 +154,7 @@ The current gates cover:
 - Real Qdrant tenant isolation and vector cleanup
 - Live Alembic migrations through the current schema head
 - Runtime smoke checks for Docker services, backend health, and frontend availability
+- GitHub Actions quality and infrastructure integration workflows
 
 See [docs/MVP_ACCEPTANCE_CHECKLIST.md](docs/MVP_ACCEPTANCE_CHECKLIST.md) for the
 manual acceptance pass used to validate the end-to-end MVP.
