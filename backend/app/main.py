@@ -4,7 +4,7 @@ from typing import AsyncGenerator
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.api.v1 import auth, chat, compare, insights, jobs, qa, sources, spaces
+from app.api.v1 import auth, briefs, chat, compare, insights, jobs, qa, sources, spaces
 from app.core.config import settings
 
 
@@ -45,6 +45,7 @@ def create_app() -> FastAPI:
     app.include_router(chat.router, prefix=API_PREFIX)
     app.include_router(compare.router, prefix=API_PREFIX)
     app.include_router(insights.router, prefix=API_PREFIX)
+    app.include_router(briefs.router, prefix=API_PREFIX)
 
     @app.get("/health", tags=["health"])
     async def health_check() -> dict[str, str]:
