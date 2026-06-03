@@ -103,6 +103,14 @@ def test_production_rejects_placeholder_jwt_secrets() -> None:
             JWT_REFRESH_SECRET="change-me-in-production-refresh-secret",
         )
 
+    with pytest.raises(ValidationError, match="JWT_ACCESS_SECRET"):
+        Settings(
+            ENVIRONMENT="production",
+            DEBUG=False,
+            JWT_ACCESS_SECRET="replace-with-random-secret-at-least-32-characters",
+            JWT_REFRESH_SECRET="b" * 40,
+        )
+
 
 def test_production_accepts_strong_jwt_secrets() -> None:
     settings = Settings(

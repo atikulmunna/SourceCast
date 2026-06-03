@@ -2,7 +2,7 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 from pydantic import field_validator, model_validator
 from typing import Literal
 
-PLACEHOLDER_SECRET_MARKERS = ("change-me", "in-production", "your-")
+PLACEHOLDER_SECRET_MARKERS = ("change-me", "in-production", "replace-with", "your-")
 
 
 class Settings(BaseSettings):

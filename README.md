@@ -116,6 +116,8 @@ GROQ_API_KEY=your_key_here
 
 Use strong `JWT_ACCESS_SECRET` and `JWT_REFRESH_SECRET` values before any
 deployment. `QDRANT_API_KEY` is only needed for hosted Qdrant.
+See [docs/DEPLOYMENT_ENV.md](docs/DEPLOYMENT_ENV.md) before switching to
+`ENVIRONMENT=production`.
 
 ## Verification
 

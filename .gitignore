@@ -8,9 +8,11 @@ SourceCast_SRS*.md
 backend/.env
 backend/.env.*
 !backend/.env.example
+!backend/.env.production.example
 frontend/.env.local
 frontend/.env.*
 !frontend/.env.local.example
+!frontend/.env.production.example
 
 # Python
 backend/.venv/
