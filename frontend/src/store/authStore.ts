@@ -1,7 +1,7 @@
 "use client";
 
 import { create } from "zustand";
-import api from "@/lib/api";
+import api, { setSessionExpiredHandler } from "@/lib/api";
 import { User, TokenResponse } from "@/lib/types";
 
 interface AuthState {
@@ -21,6 +21,13 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   isLoading: true,
 
   initialize: async () => {
+    setSessionExpiredHandler(() => {
+      if (typeof window !== "undefined") {
+        window.__sourcecast_access_token = undefined;
+      }
+      set({ user: null, isAuthenticated: false, isLoading: false });
+    });
+
     try {
       // Attempt silent refresh on app load to restore session
       const { data } = await api.post<TokenResponse>("/auth/refresh");
@@ -43,7 +50,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       window.__sourcecast_access_token = data.access_token;
     }
     const { data: user } = await api.get<User>("/auth/me");
-    set({ user, isAuthenticated: true });
+    set({ user, isAuthenticated: true, isLoading: false });
   },
 
   register: async (email: string, password: string, name?: string) => {
@@ -59,7 +66,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       if (typeof window !== "undefined") {
         window.__sourcecast_access_token = undefined;
       }
-      set({ user: null, isAuthenticated: false });
+      set({ user: null, isAuthenticated: false, isLoading: false });
     }
   },
 }));

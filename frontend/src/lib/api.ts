@@ -1,6 +1,9 @@
 import axios, { AxiosError, AxiosRequestConfig, AxiosResponse } from "axios";
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+type SessionExpiredHandler = () => void;
+
+let sessionExpiredHandler: SessionExpiredHandler | null = null;
 
 export const api = axios.create({
   baseURL: `${API_URL}/api/v1`,
@@ -9,6 +12,25 @@ export const api = axios.create({
     "Content-Type": "application/json",
   },
 });
+
+export function setSessionExpiredHandler(handler: SessionExpiredHandler | null) {
+  sessionExpiredHandler = handler;
+}
+
+export function notifySessionExpired() {
+  if (typeof window !== "undefined") {
+    window.__sourcecast_access_token = undefined;
+  }
+
+  if (sessionExpiredHandler) {
+    sessionExpiredHandler();
+    return;
+  }
+
+  if (typeof window !== "undefined" && window.location.pathname !== "/login") {
+    window.location.href = "/login";
+  }
+}
 
 // Track in-flight refresh to avoid duplicate calls
 let isRefreshing = false;
@@ -82,10 +104,7 @@ api.interceptors.response.use(
         return api(originalRequest);
       } catch (refreshError) {
         processQueue(refreshError, null);
-        if (typeof window !== "undefined") {
-          window.__sourcecast_access_token = undefined;
-          window.location.href = "/login";
-        }
+        notifySessionExpired();
         return Promise.reject(refreshError);
       } finally {
         isRefreshing = false;
