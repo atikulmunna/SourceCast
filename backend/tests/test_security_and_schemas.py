@@ -74,3 +74,42 @@ def test_debug_setting_accepts_release_environment_value() -> None:
     settings = Settings(DEBUG="release")
 
     assert settings.DEBUG is False
+
+
+def test_production_rejects_debug_mode() -> None:
+    with pytest.raises(ValidationError, match="DEBUG must be false"):
+        Settings(
+            ENVIRONMENT="production",
+            DEBUG=True,
+            JWT_ACCESS_SECRET="a" * 40,
+            JWT_REFRESH_SECRET="b" * 40,
+        )
+
+
+def test_production_rejects_placeholder_jwt_secrets() -> None:
+    with pytest.raises(ValidationError, match="JWT_ACCESS_SECRET"):
+        Settings(
+            ENVIRONMENT="production",
+            DEBUG=False,
+            JWT_ACCESS_SECRET="change-me-in-production-access-secret",
+            JWT_REFRESH_SECRET="b" * 40,
+        )
+
+    with pytest.raises(ValidationError, match="JWT_REFRESH_SECRET"):
+        Settings(
+            ENVIRONMENT="production",
+            DEBUG=False,
+            JWT_ACCESS_SECRET="a" * 40,
+            JWT_REFRESH_SECRET="change-me-in-production-refresh-secret",
+        )
+
+
+def test_production_accepts_strong_jwt_secrets() -> None:
+    settings = Settings(
+        ENVIRONMENT="production",
+        DEBUG=False,
+        JWT_ACCESS_SECRET="access-secret-with-more-than-32-characters",
+        JWT_REFRESH_SECRET="refresh-secret-with-more-than-32-characters",
+    )
+
+    assert settings.ENVIRONMENT == "production"

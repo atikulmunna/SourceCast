@@ -1,6 +1,8 @@
 from pydantic_settings import BaseSettings, SettingsConfigDict
-from pydantic import field_validator
+from pydantic import field_validator, model_validator
 from typing import Literal
+
+PLACEHOLDER_SECRET_MARKERS = ("change-me", "in-production", "your-")
 
 
 class Settings(BaseSettings):
@@ -21,6 +23,22 @@ class Settings(BaseSettings):
         if isinstance(value, str) and value.lower() in {"release", "prod", "production"}:
             return False
         return value
+
+    @model_validator(mode="after")
+    def validate_production_settings(self) -> "Settings":
+        if self.ENVIRONMENT != "production":
+            return self
+
+        if self.DEBUG:
+            raise ValueError("DEBUG must be false when ENVIRONMENT=production")
+
+        for name in ("JWT_ACCESS_SECRET", "JWT_REFRESH_SECRET"):
+            value = getattr(self, name)
+            normalized = value.lower()
+            if len(value) < 32 or any(marker in normalized for marker in PLACEHOLDER_SECRET_MARKERS):
+                raise ValueError(f"{name} must be a strong non-placeholder secret in production")
+
+        return self
 
     # ── Database ──────────────────────────────────────────────────────────────
     DATABASE_URL: str = (
