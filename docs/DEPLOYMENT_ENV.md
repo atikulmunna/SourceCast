@@ -52,3 +52,12 @@ Run the runtime smoke check after deploying or restarting services:
 ```powershell
 .\check_runtime.ps1 -BackendUrl "https://api.example.com" -FrontendUrl "https://app.example.com"
 ```
+
+## Container Packaging
+
+The repository includes production Dockerfiles for the backend and frontend plus
+`docker-compose.prod.example.yml`. Copy the example compose file before editing
+real secrets, then replace every `replace-with-*` value.
+
+The production compose example stays on `LLM_PROVIDER=extractive`, so no hosted
+LLM API key is required until you choose to enable `groq`.
