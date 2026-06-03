@@ -13,6 +13,7 @@ import { JobProgressPanel } from "@/components/jobs/JobProgressPanel";
 import { SpaceChatPanel } from "@/components/spaces/SpaceChatPanel";
 import { SourceComparisonPanel } from "@/components/spaces/SourceComparisonPanel";
 import { SavedInsightsPanel } from "@/components/insights/SavedInsightsPanel";
+import { ResearchBriefsPanel } from "@/components/briefs/ResearchBriefsPanel";
 
 export default function SpaceDetailPage() {
   const { spaceId } = useParams<{ spaceId: string }>();
@@ -145,6 +146,8 @@ export default function SpaceDetailPage() {
       <SourceComparisonPanel sources={sources} spaceId={spaceId} />
 
       <SavedInsightsPanel spaceId={spaceId} />
+
+      <ResearchBriefsPanel spaceId={spaceId} sources={sources} />
 
       <SourcePreviewModal
         open={showAddSource}

@@ -155,6 +155,19 @@ export interface SavedInsight {
   updated_at: string;
 }
 
+export interface ResearchBrief {
+  id: string;
+  user_id: string;
+  space_id: string;
+  title: string;
+  topic: string | null;
+  content_markdown: string | null;
+  source_ids: string[];
+  status: "READY" | "FAILED";
+  created_at: string;
+  updated_at: string;
+}
+
 export interface ChatSession {
   id: string;
   user_id: string;
