@@ -4,10 +4,11 @@ SourceCast is an evidence-first research workspace for podcasts, YouTube videos,
 lectures, interviews, and other long-form audio or video sources. It turns media
 into a private, searchable knowledge base with timestamped transcript evidence.
 
-The current vertical slice supports secure accounts, knowledge spaces, source
-preview and ingestion, background transcription, transcript chunking, vector
-indexing, authenticated job streaming, transcript browsing, source-scoped
-evidence retrieval, and cleanup when a source is deleted.
+The current MVP supports secure accounts, knowledge spaces, source preview and
+ingestion, background transcription, transcript chunking, vector indexing,
+authenticated job streaming, transcript browsing, evidence-grounded chat,
+cross-source comparison, saved insights, Markdown research briefs, timestamp
+citations, and cleanup when a source is deleted.
 
 ## Why SourceCast
 
@@ -23,8 +24,11 @@ attribution throughout the workflow.
 3. Preview and ingest a supported media URL.
 4. Follow ingestion progress through authenticated Server-Sent Events.
 5. Browse paginated timestamped transcript segments.
-6. Ask a source-scoped question and inspect the strongest evidence cards.
-7. Delete the source and clean up relational data, temporary audio, and vectors.
+6. Ask source- or space-scoped questions and inspect timestamped evidence cards.
+7. Resume persisted chat sessions and save useful answers or evidence snippets.
+8. Compare indexed sources on a topic with grouped evidence and missing-evidence notices.
+9. Generate and export Markdown research briefs from saved insights and selected sources.
+10. Delete sources or chats and clean up related relational data, temporary audio, and vectors.
 
 ## Architecture
 
@@ -35,7 +39,7 @@ Next.js frontend
       v
 FastAPI backend
       |
-      +-- PostgreSQL: users, spaces, sources, jobs, transcript segments, chunks
+      +-- PostgreSQL: users, spaces, sources, jobs, transcripts, chats, insights, briefs
       +-- Redis + ARQ: asynchronous ingestion jobs
       +-- faster-whisper: timestamped transcription
       +-- sentence-transformers: local embeddings
@@ -92,13 +96,26 @@ python worker.py
 
 ```powershell
 cd frontend
-Copy-Item .env.local.example .env.local
 npm install
 npm run dev
 ```
 
 Open `http://localhost:3000`. FastAPI documentation is available at
 `http://localhost:8000/api/docs`.
+
+### API keys
+
+No external AI API key is required for local MVP verification. By default,
+`LLM_PROVIDER=extractive`, which keeps grounded answers and comparisons local
+and deterministic. To test hosted answer generation, set:
+
+```env
+LLM_PROVIDER=groq
+GROQ_API_KEY=your_key_here
+```
+
+Use strong `JWT_ACCESS_SECRET` and `JWT_REFRESH_SECRET` values before any
+deployment. `QDRANT_API_KEY` is only needed for hosted Qdrant.
 
 ## Verification
 
@@ -125,6 +142,10 @@ The current gates cover:
 - Real PostgreSQL persistence and cascading deletion
 - Real Redis queue dispatch
 - Real Qdrant tenant isolation and vector cleanup
+- Live Alembic migrations through the current schema head
+
+See [docs/MVP_ACCEPTANCE_CHECKLIST.md](docs/MVP_ACCEPTANCE_CHECKLIST.md) for the
+manual acceptance pass used to validate the end-to-end MVP.
 
 ## Current Status
 
@@ -137,12 +158,17 @@ The current gates cover:
 | Vector indexing and tenant-filtered retrieval | Implemented |
 | SSE progress, stale detection, and retries | Implemented |
 | Source cleanup | Implemented |
-| Persisted evidence chat and answer streaming | Next |
-| Comparison, saved insights, and research briefs | Planned |
+| Persisted evidence chat and answer streaming | Implemented |
+| Chat session resume | Implemented |
+| Clickable timestamp citations | Implemented |
+| Cross-source comparison | Implemented |
+| Saved insights | Implemented |
+| Markdown research briefs | Implemented |
+| True token-by-token provider streaming | Planned |
+| PDF/Notion exports | Planned |
 
 ## Privacy
 
 SourceCast is designed for private research workflows. Full transcripts are not
 published by default, retrieved evidence is excerpted, and source deletion
 removes associated transcript records and vector points.
-
