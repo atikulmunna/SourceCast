@@ -79,7 +79,7 @@ cd backend
 python -m venv .venv
 .\.venv\Scripts\Activate.ps1
 pip install -e ".[dev]"
-Copy-Item .env.example .env
+Copy-Item .env.example .env -Force
 alembic upgrade head
 uvicorn app.main:app --reload --port 8000
 ```
@@ -146,6 +146,7 @@ The current gates cover:
 
 See [docs/MVP_ACCEPTANCE_CHECKLIST.md](docs/MVP_ACCEPTANCE_CHECKLIST.md) for the
 manual acceptance pass used to validate the end-to-end MVP.
+See [docs/DEMO_RUNBOOK.md](docs/DEMO_RUNBOOK.md) for a repeatable local demo path.
 
 ## Current Status
 

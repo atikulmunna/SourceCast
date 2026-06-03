@@ -1,5 +1,5 @@
 @echo off
 title SourceCast Frontend
-cd /d C:\Users\Munna\Documents\GitSync\SourceCast\frontend
+cd /d "%~dp0frontend"
 npm run dev
 pause
