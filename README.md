@@ -132,6 +132,12 @@ available:
 .\check_integration.ps1
 ```
 
+When the local backend and frontend are running, verify demo readiness with:
+
+```powershell
+.\check_runtime.ps1
+```
+
 The current gates cover:
 
 - Backend unit and service tests
@@ -143,6 +149,7 @@ The current gates cover:
 - Real Redis queue dispatch
 - Real Qdrant tenant isolation and vector cleanup
 - Live Alembic migrations through the current schema head
+- Runtime smoke checks for Docker services, backend health, and frontend availability
 
 See [docs/MVP_ACCEPTANCE_CHECKLIST.md](docs/MVP_ACCEPTANCE_CHECKLIST.md) for the
 manual acceptance pass used to validate the end-to-end MVP.

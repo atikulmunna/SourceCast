@@ -29,6 +29,12 @@ npm run dev
 
 Open `http://localhost:3000`.
 
+Before starting the demo flow, verify the running stack:
+
+```powershell
+.\check_runtime.ps1
+```
+
 ## 2. Prepare Demo Data
 
 - Register a demo user with an email you can recognize.
