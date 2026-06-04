@@ -43,6 +43,7 @@ services:
       - ./backend/.env.production.example
     environment:
       DATABASE_URL: postgresql+asyncpg://sourcecast:replace-with-database-password@postgres:5432/sourcecast
+      DIRECT_URL: postgresql+asyncpg://sourcecast:replace-with-database-password@postgres:5432/sourcecast
       REDIS_URL: redis://redis:6379/0
       QDRANT_URL: http://qdrant:6333
       FRONTEND_URL: http://localhost:3000
@@ -67,6 +68,7 @@ services:
       - ./backend/.env.production.example
     environment:
       DATABASE_URL: postgresql+asyncpg://sourcecast:replace-with-database-password@postgres:5432/sourcecast
+      DIRECT_URL: postgresql+asyncpg://sourcecast:replace-with-database-password@postgres:5432/sourcecast
       REDIS_URL: redis://redis:6379/0
       QDRANT_URL: http://qdrant:6333
       FRONTEND_URL: http://localhost:3000

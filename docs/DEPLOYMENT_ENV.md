@@ -9,6 +9,7 @@ Use this checklist before setting `ENVIRONMENT=production`.
 | `ENVIRONMENT` | Set to `production`. |
 | `DEBUG` | Set to `false`. |
 | `DATABASE_URL` | Use a managed or private PostgreSQL URL. |
+| `DIRECT_URL` | Optional migration-only database URL; recommended for Supabase session pooler. |
 | `REDIS_URL` | Use a managed or private Redis URL. |
 | `QDRANT_URL` | Use a hosted Qdrant URL or a private service URL. |
 | `JWT_ACCESS_SECRET` | Use a random secret with at least 32 characters. |
@@ -25,6 +26,19 @@ Use this checklist before setting `ENVIRONMENT=production`.
 | `LLM_PROVIDER` | Keep `extractive` for no external LLM key, or use `groq` for hosted generation. |
 | `LLM_MODEL` | Set to the hosted model name when using `groq`. |
 | `WHISPER_MODEL` | Smaller models are faster; larger models need more CPU or GPU capacity. |
+
+## Supabase Database URLs
+
+For Supabase, use the transaction-mode pooler for runtime and the session-mode
+pooler for Alembic migrations:
+
+```env
+DATABASE_URL=postgresql+asyncpg://postgres.project-ref:YOUR_URL_ENCODED_PASSWORD@aws-1-region.pooler.supabase.com:6543/postgres?ssl=require&prepared_statement_cache_size=0
+DIRECT_URL=postgresql+asyncpg://postgres.project-ref:YOUR_URL_ENCODED_PASSWORD@aws-1-region.pooler.supabase.com:5432/postgres?ssl=require
+```
+
+If the password includes reserved URL characters, URL-encode it before placing it
+in either connection string.
 
 ## Required Frontend Values
 

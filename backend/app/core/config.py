@@ -44,6 +44,11 @@ class Settings(BaseSettings):
     DATABASE_URL: str = (
         "postgresql+asyncpg://sourcecast:sourcecast_dev@localhost:5432/sourcecast"
     )
+    DIRECT_URL: str = ""
+
+    @property
+    def migration_database_url(self) -> str:
+        return self.DIRECT_URL or self.DATABASE_URL
 
     # ── Auth ──────────────────────────────────────────────────────────────────
     JWT_ACCESS_SECRET: str = "change-me-access-secret"

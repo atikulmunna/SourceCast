@@ -121,3 +121,18 @@ def test_production_accepts_strong_jwt_secrets() -> None:
     )
 
     assert settings.ENVIRONMENT == "production"
+
+
+def test_migration_database_url_defaults_to_runtime_database_url() -> None:
+    settings = Settings(DATABASE_URL="postgresql+asyncpg://runtime/db")
+
+    assert settings.migration_database_url == "postgresql+asyncpg://runtime/db"
+
+
+def test_migration_database_url_prefers_direct_url() -> None:
+    settings = Settings(
+        DATABASE_URL="postgresql+asyncpg://runtime/db",
+        DIRECT_URL="postgresql+asyncpg://migration/db",
+    )
+
+    assert settings.migration_database_url == "postgresql+asyncpg://migration/db"
