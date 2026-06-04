@@ -49,11 +49,7 @@ export function AppSidebar() {
           className="h-14 px-4 flex items-center gap-2 border-b shrink-0"
           style={{ borderColor: "var(--border)" }}
         >
-          <div
-            className="brand-mark"
-          >
-            SC
-          </div>
+          <div className="brand-mark" aria-hidden="true" />
           <span className="font-semibold text-sm">SourceCast</span>
         </div>
 

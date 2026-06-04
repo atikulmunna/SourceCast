@@ -71,9 +71,7 @@ export default function RegisterPage() {
         {/* Logo */}
         <div className="text-center mb-8">
           <div className="inline-flex items-center gap-2 mb-4">
-            <div className="brand-mark">
-              SC
-            </div>
+            <div className="brand-mark" aria-hidden="true" />
             <span className="font-semibold text-xl">SourceCast</span>
           </div>
           <h1 className="text-2xl font-semibold mb-1">Create your workspace</h1>

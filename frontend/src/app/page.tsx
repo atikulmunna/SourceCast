@@ -55,7 +55,7 @@ export default function LandingPage() {
       >
         <div className="mx-auto flex h-16 max-w-6xl items-center justify-between px-5">
           <Link href="/" className="flex items-center gap-3">
-            <span className="brand-mark">SC</span>
+            <span className="brand-mark" aria-hidden="true" />
             <span className="text-sm font-semibold tracking-[0.02em]">SourceCast</span>
           </Link>
           <nav className="flex items-center gap-2">
