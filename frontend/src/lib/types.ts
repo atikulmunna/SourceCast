@@ -212,9 +212,19 @@ export interface ApiError {
 
 export function getErrorMessage(error: unknown): string {
   if (!error || typeof error !== "object") return "An unexpected error occurred";
-  const err = error as { response?: { data?: ApiError } };
-  const detail = err.response?.data?.detail;
-  if (!detail) return "An unexpected error occurred";
+  const err = error as {
+    message?: string;
+    response?: { status?: number; data?: ApiError | string };
+  };
+  const data = err.response?.data;
+  if (typeof data === "string" && data.trim()) return data;
+  const detail = typeof data === "object" ? data?.detail : undefined;
+  if (!detail) {
+    if (err.response?.status === 500) {
+      return "The server hit an error while processing this request.";
+    }
+    return err.message || "An unexpected error occurred";
+  }
   if (typeof detail === "string") return detail;
   if (Array.isArray(detail)) return detail.map((d) => d.msg).join(", ");
   return "An unexpected error occurred";

@@ -40,6 +40,9 @@ DIRECT_URL=postgresql+asyncpg://postgres.project-ref:YOUR_URL_ENCODED_PASSWORD@a
 If the password includes reserved URL characters, URL-encode it before placing it
 in either connection string.
 
+SourceCast automatically detects the Supabase transaction pooler URL and disables
+asyncpg prepared-statement caching for runtime connections.
+
 ## Required Frontend Values
 
 | Variable | Production requirement |
