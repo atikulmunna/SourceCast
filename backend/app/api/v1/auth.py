@@ -11,20 +11,29 @@ REFRESH_COOKIE_NAME = "sourcecast_refresh"
 COOKIE_PATH = "/api/v1/auth"
 
 
+def _refresh_cookie_samesite() -> str:
+    return "none" if settings.ENVIRONMENT == "production" else "lax"
+
+
 def _set_refresh_cookie(response: Response, raw_token: str) -> None:
     response.set_cookie(
         key=REFRESH_COOKIE_NAME,
         value=raw_token,
         httponly=True,
         secure=settings.ENVIRONMENT == "production",
-        samesite="lax",
+        samesite=_refresh_cookie_samesite(),
         max_age=settings.REFRESH_TOKEN_EXPIRES_DAYS * 86400,
         path=COOKIE_PATH,
     )
 
 
 def _clear_refresh_cookie(response: Response) -> None:
-    response.delete_cookie(key=REFRESH_COOKIE_NAME, path=COOKIE_PATH)
+    response.delete_cookie(
+        key=REFRESH_COOKIE_NAME,
+        path=COOKIE_PATH,
+        secure=settings.ENVIRONMENT == "production",
+        samesite=_refresh_cookie_samesite(),
+    )
 
 
 @router.post("/register", response_model=UserOut, status_code=status.HTTP_201_CREATED)
