@@ -47,9 +47,7 @@ services:
       REDIS_URL: redis://redis:6379/0
       QDRANT_URL: http://qdrant:6333
       FRONTEND_URL: http://localhost:3000
-    command: >
-      sh -c "alembic upgrade head &&
-      uvicorn app.main:app --host 0.0.0.0 --port 8000"
+    command: ["./start-web.sh"]
     ports:
       - "8000:8000"
     depends_on:
@@ -72,7 +70,7 @@ services:
       REDIS_URL: redis://redis:6379/0
       QDRANT_URL: http://qdrant:6333
       FRONTEND_URL: http://localhost:3000
-    command: ["python", "worker.py"]
+    command: ["./start-worker.sh"]
     depends_on:
       backend:
         condition: service_started

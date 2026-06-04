@@ -75,3 +75,15 @@ real secrets, then replace every `replace-with-*` value.
 
 The production compose example stays on `LLM_PROVIDER=extractive`, so no hosted
 LLM API key is required until you choose to enable `groq`.
+
+For Render Docker deployments, set the backend web service Docker command to:
+
+```sh
+./start-web.sh
+```
+
+Set the Render background worker Docker command to:
+
+```sh
+./start-worker.sh
+```

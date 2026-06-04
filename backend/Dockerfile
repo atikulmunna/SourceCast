@@ -14,14 +14,16 @@ RUN apt-get update \
 COPY pyproject.toml ./
 COPY app ./app
 COPY alembic ./alembic
-COPY alembic.ini worker.py ./
+COPY alembic.ini worker.py start-web.sh start-worker.sh ./
 
 RUN pip install . \
     && mkdir -p /app/tmp \
+    && sed -i 's/\r$//' /app/start-web.sh /app/start-worker.sh \
+    && chmod +x /app/start-web.sh /app/start-worker.sh \
     && chown -R sourcecast:sourcecast /app /home/sourcecast
 
 USER sourcecast
 
 EXPOSE 8000
 
-CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
+CMD ["./start-web.sh"]

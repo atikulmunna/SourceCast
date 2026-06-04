@@ -124,7 +124,7 @@ def test_production_accepts_strong_jwt_secrets() -> None:
 
 
 def test_migration_database_url_defaults_to_runtime_database_url() -> None:
-    settings = Settings(DATABASE_URL="postgresql+asyncpg://runtime/db")
+    settings = Settings(DATABASE_URL="postgresql+asyncpg://runtime/db", DIRECT_URL="")
 
     assert settings.migration_database_url == "postgresql+asyncpg://runtime/db"
 
