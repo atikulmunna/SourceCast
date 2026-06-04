@@ -112,6 +112,12 @@ async def test_create_source_enqueues_worker_job(monkeypatch: pytest.MonkeyPatch
     assert source.title == "Test audio"
     assert job.status == "QUEUED"
     assert job.worker_task_id == "arq-job-1"
+    assert job.stage == "queue"
+    assert job.progress == 1
+    assert job.current_step == "Waiting for the worker to start processing..."
+    assert job.heartbeat_at is not None
+    assert job.error_code is None
+    assert job.error_message is None
     assert redis.closed is True
 
 
@@ -141,4 +147,3 @@ async def test_create_source_marks_job_failed_when_queue_is_unavailable(
 
     assert job.status == "FAILED"
     assert job.error_code == "QUEUE_UNAVAILABLE"
-

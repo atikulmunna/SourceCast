@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import logging
 import uuid
+from datetime import datetime, timezone
 
 from arq import create_pool
 from arq.connections import RedisSettings
@@ -29,6 +30,10 @@ from app.models.source_space import SourceSpace
 from app.services.source_preview_service import preview_source
 
 logger = logging.getLogger(__name__)
+
+
+def _now() -> datetime:
+    return datetime.now(timezone.utc)
 
 
 async def create_source_and_enqueue(
@@ -128,8 +133,16 @@ async def create_source_and_enqueue(
         await redis.aclose()
 
         # Record worker task ID and advance status
+        now = _now()
         job.worker_task_id = arq_job.job_id if arq_job else None
         job.status = "QUEUED"
+        job.stage = "queue"
+        job.progress = 1
+        job.current_step = "Waiting for the worker to start processing..."
+        job.heartbeat_at = now
+        job.updated_at = now
+        job.error_code = None
+        job.error_message = None
         await db.commit()
         await db.refresh(job)
 

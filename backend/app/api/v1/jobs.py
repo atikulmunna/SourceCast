@@ -241,8 +241,14 @@ async def retry_job(
     )
     await redis.aclose()
 
+    now = datetime.now(timezone.utc)
     job.worker_task_id = arq_job.job_id if arq_job else None
     job.status = "QUEUED"
+    job.stage = "queue"
+    job.progress = 1
+    job.current_step = "Waiting for the worker to start processing..."
+    job.heartbeat_at = now
+    job.updated_at = now
     job.error_code = None
     job.error_message = None
     await db.commit()
