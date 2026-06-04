@@ -50,8 +50,7 @@ export function AppSidebar() {
           style={{ borderColor: "var(--border)" }}
         >
           <div
-            className="w-7 h-7 rounded-lg flex items-center justify-center text-xs font-bold"
-            style={{ background: "linear-gradient(135deg, #0d9488, #0891b2)" }}
+            className="brand-mark"
           >
             SC
           </div>
@@ -173,18 +172,18 @@ function SidebarLink({
   return (
     <Link
       href={href}
-      className="flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm transition-all group"
+      className="flex items-center gap-2.5 px-3 py-2 rounded-md text-sm transition-all group"
       style={{
-        background: active ? "rgba(13,148,136,0.12)" : "transparent",
-        color: active ? "#2dd4bf" : "var(--text-secondary)",
+        background: active ? "var(--bg-card)" : "transparent",
+        color: active ? "var(--text-primary)" : "var(--text-secondary)",
         border: active
-          ? "1px solid rgba(13,148,136,0.2)"
+          ? "1px solid var(--border)"
           : "1px solid transparent",
       }}
     >
       {icon}
       <span className="flex-1 truncate">{label}</span>
-      {active && <ChevronRight size={13} style={{ color: "#2dd4bf" }} />}
+      {active && <ChevronRight size={13} style={{ color: "var(--text-muted)" }} />}
     </Link>
   );
 }

@@ -80,7 +80,7 @@ export default function SourceDetailPage() {
   if (sourceLoading || !source) {
     return (
       <div className="min-h-full flex items-center justify-center">
-        <Loader2 size={24} className="animate-spin" style={{ color: "#2dd4bf" }} />
+        <Loader2 size={24} className="animate-spin" style={{ color: "var(--accent)" }} />
       </div>
     );
   }
@@ -101,7 +101,7 @@ export default function SourceDetailPage() {
       <header className="mb-8">
         <div className="flex items-start justify-between gap-4">
           <div className="min-w-0">
-            <h1 className="text-2xl font-bold truncate">{source.title || "Untitled source"}</h1>
+            <h1 className="text-2xl font-semibold truncate">{source.title || "Untitled source"}</h1>
             <div className="flex flex-wrap gap-3 mt-2 text-sm" style={{ color: "var(--text-muted)" }}>
               {source.creator_name && <span>{source.creator_name}</span>}
               {source.duration_sec && (
@@ -124,8 +124,8 @@ export default function SourceDetailPage() {
             <span
               className="px-3 py-1.5 rounded-full text-xs font-medium"
               style={{
-                background: ready ? "rgba(13,148,136,0.12)" : "rgba(161,161,181,0.08)",
-                color: ready ? "#2dd4bf" : "var(--text-secondary)",
+                background: ready ? "rgba(143,185,168,0.12)" : "rgba(161,161,181,0.08)",
+                color: ready ? "var(--accent-strong)" : "var(--text-secondary)",
               }}
             >
               {source.status}
@@ -195,7 +195,7 @@ export default function SourceDetailPage() {
 
         <aside className="rounded-xl p-4 sticky top-6" style={panelStyle}>
           <div className="flex items-center gap-2 mb-3">
-            <Search size={17} style={{ color: "#2dd4bf" }} />
+            <Search size={17} style={{ color: "var(--accent)" }} />
             <h2 className="font-semibold">Ask This Source</h2>
           </div>
           <form onSubmit={ask} className="space-y-3">
@@ -214,8 +214,7 @@ export default function SourceDetailPage() {
             />
             <button
               disabled={!ready || asking || !question.trim()}
-              className="w-full py-2.5 rounded-xl text-sm font-semibold flex items-center justify-center gap-2 disabled:opacity-40"
-              style={{ background: "linear-gradient(135deg, #0d9488, #0891b2)", color: "#fff" }}
+              className="primary-button w-full disabled:opacity-40"
             >
               {asking && <Loader2 size={15} className="animate-spin" />}
               Ask with evidence
@@ -236,7 +235,7 @@ export default function SourceDetailPage() {
                   <div key={item.chunk_id} className="rounded-lg p-3" style={{ background: "var(--bg-secondary)", border: "1px solid var(--border)" }}>
                     <div className="flex items-center justify-between gap-2 mb-2">
                       <div className="flex items-center gap-2">
-                        <span className="text-xs font-medium" style={{ color: "#2dd4bf" }}>
+                        <span className="text-xs font-medium" style={{ color: "var(--accent-strong)" }}>
                           {formatTimestamp(Number(item.start_time_sec))} - {formatTimestamp(Number(item.end_time_sec))}
                         </span>
                         {item.navigation_url && (
@@ -246,7 +245,7 @@ export default function SourceDetailPage() {
                             rel="noreferrer"
                             title="Open source at timestamp"
                             className="hover:opacity-80"
-                            style={{ color: "#2dd4bf" }}
+                            style={{ color: "var(--accent-strong)" }}
                           >
                             <ExternalLink size={13} />
                           </a>
@@ -273,7 +272,7 @@ export default function SourceDetailPage() {
 function TranscriptRow({ segment }: { segment: TranscriptSegment }) {
   return (
     <div className="grid grid-cols-[84px_minmax(0,1fr)] gap-4 p-4">
-      <span className="text-xs font-medium" style={{ color: "#2dd4bf" }}>
+      <span className="text-xs font-medium" style={{ color: "var(--accent-strong)" }}>
         {formatTimestamp(Number(segment.start_time_sec))}
       </span>
       <p className="text-sm leading-relaxed" style={{ color: "var(--text-secondary)" }}>

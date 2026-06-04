@@ -71,17 +71,12 @@ export default function RegisterPage() {
         {/* Logo */}
         <div className="text-center mb-8">
           <div className="inline-flex items-center gap-2 mb-4">
-            <div
-              className="w-9 h-9 rounded-xl flex items-center justify-center text-sm font-bold"
-              style={{
-                background: "linear-gradient(135deg, #0d9488, #0891b2)",
-              }}
-            >
+            <div className="brand-mark">
               SC
             </div>
             <span className="font-semibold text-xl">SourceCast</span>
           </div>
-          <h1 className="text-2xl font-bold mb-1">Create your workspace</h1>
+          <h1 className="text-2xl font-semibold mb-1">Create your workspace</h1>
           <p className="text-sm" style={{ color: "var(--text-muted)" }}>
             Free. No credit card required.
           </p>
@@ -89,8 +84,7 @@ export default function RegisterPage() {
 
         {/* Card */}
         <div
-          className="rounded-2xl p-8 gradient-border"
-          style={{ background: "var(--bg-card)" }}
+          className="surface p-8"
         >
           <form
             onSubmit={handleSubmit(onSubmit)}
@@ -241,11 +235,7 @@ export default function RegisterPage() {
               id="register-submit"
               type="submit"
               disabled={isSubmitting}
-              className="w-full flex items-center justify-center gap-2 py-3 rounded-xl font-semibold text-sm transition-all hover:opacity-90 active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed"
-              style={{
-                background: "linear-gradient(135deg, #0d9488, #0891b2)",
-                color: "#fff",
-              }}
+              className="primary-button w-full disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {isSubmitting ? (
                 <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
@@ -266,7 +256,7 @@ export default function RegisterPage() {
           <Link
             href="/login"
             className="font-medium transition-colors hover:opacity-80"
-            style={{ color: "#2dd4bf" }}
+            style={{ color: "var(--accent-strong)" }}
           >
             Sign in
           </Link>

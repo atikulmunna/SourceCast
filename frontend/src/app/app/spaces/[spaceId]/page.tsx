@@ -75,16 +75,10 @@ export default function SpaceDetailPage() {
       >
         <div>
           <div className="flex items-center gap-3 mb-2">
-            <div
-              className="w-9 h-9 rounded-xl flex items-center justify-center"
-              style={{
-                background: "rgba(13,148,136,0.1)",
-                border: "1px solid rgba(13,148,136,0.2)",
-              }}
-            >
-              <Layers size={18} style={{ color: "#2dd4bf" }} />
+            <div className="w-9 h-9 rounded-lg flex items-center justify-center" style={{ background: "var(--bg-card)", border: "1px solid var(--border)" }}>
+              <Layers size={18} style={{ color: "var(--accent)" }} />
             </div>
-            <h1 className="text-2xl font-bold">{space.name}</h1>
+            <h1 className="text-2xl font-semibold">{space.name}</h1>
           </div>
           {space.description && (
             <p className="text-sm ml-12" style={{ color: "var(--text-muted)" }}>
@@ -94,11 +88,7 @@ export default function SpaceDetailPage() {
         </div>
         <button
           onClick={() => setShowAddSource(true)}
-          className="px-4 py-2.5 rounded-xl text-sm font-medium flex items-center gap-2 transition-all hover:opacity-90"
-          style={{
-            background: "linear-gradient(135deg, #0d9488, #0891b2)",
-            color: "#fff",
-          }}
+          className="primary-button"
         >
           <Plus size={16} />
           Add Source
@@ -161,16 +151,15 @@ export default function SpaceDetailPage() {
 
 function EmptySources({ onAdd }: { onAdd: () => void }) {
   return (
-    <div className="rounded-xl p-8 text-center" style={{ background: "var(--bg-card)", border: "1px solid var(--border)" }}>
-      <Radio size={24} className="mx-auto mb-3" style={{ color: "#2dd4bf" }} />
+    <div className="surface p-8 text-center">
+      <Radio size={24} className="mx-auto mb-3" style={{ color: "var(--accent)" }} />
       <h3 className="font-semibold mb-1">No sources in this space</h3>
       <p className="text-sm mb-5" style={{ color: "var(--text-muted)" }}>
         Add a short video or audio source to start the research loop.
       </p>
       <button
         onClick={onAdd}
-        className="px-4 py-2 rounded-xl text-sm font-medium"
-        style={{ background: "linear-gradient(135deg, #0d9488, #0891b2)", color: "#fff" }}
+        className="primary-button"
       >
         Add Source
       </button>
@@ -186,8 +175,8 @@ function SourceRow({ source }: { source: Source }) {
       className="rounded-xl p-4 flex items-center gap-4 transition-all hover:opacity-90"
       style={{ background: "var(--bg-card)", border: "1px solid var(--border)" }}
     >
-      <div className="w-12 h-12 rounded-lg flex items-center justify-center shrink-0" style={{ background: "rgba(13,148,136,0.09)" }}>
-        {ready ? <Search size={18} style={{ color: "#2dd4bf" }} /> : <FileText size={18} style={{ color: "var(--text-muted)" }} />}
+      <div className="w-12 h-12 rounded-lg flex items-center justify-center shrink-0" style={{ background: "var(--bg-secondary)" }}>
+        {ready ? <Search size={18} style={{ color: "var(--accent)" }} /> : <FileText size={18} style={{ color: "var(--text-muted)" }} />}
       </div>
       <div className="min-w-0 flex-1">
         <h3 className="font-medium text-sm truncate">{source.title || "Untitled source"}</h3>
@@ -205,8 +194,8 @@ function SourceRow({ source }: { source: Source }) {
       <span
         className="px-2.5 py-1 rounded-full text-xs font-medium"
         style={{
-          background: ready ? "rgba(13,148,136,0.12)" : "rgba(161,161,181,0.08)",
-          color: ready ? "#2dd4bf" : "var(--text-secondary)",
+          background: ready ? "rgba(143,185,168,0.12)" : "rgba(161,161,181,0.08)",
+          color: ready ? "var(--accent-strong)" : "var(--text-secondary)",
         }}
       >
         {source.status}

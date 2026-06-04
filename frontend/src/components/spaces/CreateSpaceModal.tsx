@@ -72,8 +72,7 @@ export function CreateSpaceModal({ open, onClose, onCreated }: Props) {
             className="fixed inset-0 z-50 flex items-center justify-center p-4"
           >
             <div
-              className="w-full max-w-md rounded-2xl p-6 gradient-border"
-              style={{ background: "var(--bg-card)" }}
+              className="surface w-full max-w-md p-6"
             >
               {/* Header */}
               <div className="flex items-center justify-between mb-6">
@@ -81,11 +80,11 @@ export function CreateSpaceModal({ open, onClose, onCreated }: Props) {
                   <div
                     className="w-9 h-9 rounded-lg flex items-center justify-center"
                     style={{
-                      background: "rgba(13,148,136,0.12)",
-                      border: "1px solid rgba(13,148,136,0.2)",
+                      background: "var(--bg-secondary)",
+                      border: "1px solid var(--border)",
                     }}
                   >
-                    <Layers size={18} style={{ color: "#2dd4bf" }} />
+                    <Layers size={18} style={{ color: "var(--accent)" }} />
                   </div>
                   <div>
                     <h2 className="font-semibold">New Knowledge Space</h2>
@@ -136,7 +135,7 @@ export function CreateSpaceModal({ open, onClose, onCreated }: Props) {
                     id="space-name"
                     type="text"
                     autoFocus
-                    placeholder="e.g. AI Research, Health Notes"
+                    placeholder="e.g. Board interviews, Lecture notes"
                     {...register("name")}
                     className="w-full px-4 py-2.5 rounded-lg text-sm outline-none"
                     style={{
@@ -180,7 +179,7 @@ export function CreateSpaceModal({ open, onClose, onCreated }: Props) {
                   <button
                     type="button"
                     onClick={handleClose}
-                    className="flex-1 py-2.5 rounded-xl text-sm font-medium transition-all"
+                    className="secondary-button flex-1"
                     style={{
                       border: "1px solid var(--border)",
                       color: "var(--text-secondary)",
@@ -192,11 +191,7 @@ export function CreateSpaceModal({ open, onClose, onCreated }: Props) {
                     id="create-space-submit"
                     type="submit"
                     disabled={isSubmitting}
-                    className="flex-1 py-2.5 rounded-xl text-sm font-semibold transition-all hover:opacity-90 disabled:opacity-50"
-                    style={{
-                      background: "linear-gradient(135deg, #0d9488, #0891b2)",
-                      color: "#fff",
-                    }}
+                    className="primary-button flex-1 disabled:opacity-50"
                   >
                     {isSubmitting ? (
                       <span className="flex items-center justify-center gap-2">

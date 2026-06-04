@@ -40,7 +40,7 @@ export default function AppDashboard() {
         <p className="text-sm mb-1" style={{ color: "var(--text-muted)" }}>
           Welcome back, {user?.name || user?.email?.split("@")[0]}
         </p>
-        <h1 className="text-3xl font-bold">Your Research Workspace</h1>
+        <h1 className="text-3xl font-semibold">Research workspace</h1>
       </motion.div>
 
       {/* Action bar */}
@@ -48,11 +48,7 @@ export default function AppDashboard() {
         <button
           id="create-space-btn"
           onClick={() => setShowCreateSpace(true)}
-          className="flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-medium transition-all hover:opacity-90 active:scale-95"
-          style={{
-            background: "linear-gradient(135deg, #0d9488, #0891b2)",
-            color: "#fff",
-          }}
+          className="primary-button"
         >
           <Plus size={16} />
           New Space
@@ -60,7 +56,7 @@ export default function AppDashboard() {
         <button
           id="add-source-btn"
           onClick={() => setShowAddSource(true)}
-          className="flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-medium transition-all"
+          className="secondary-button"
           style={{
             background: "var(--bg-card)",
             border: "1px solid var(--border)",
@@ -126,13 +122,13 @@ function EmptyState({ onCreateSpace }: { onCreateSpace: () => void }) {
       className="text-center py-20"
     >
       <div
-        className="inline-flex w-16 h-16 rounded-2xl items-center justify-center mb-5"
+        className="inline-flex w-14 h-14 rounded-lg items-center justify-center mb-5"
         style={{
-          background: "rgba(13,148,136,0.08)",
-          border: "1px solid rgba(13,148,136,0.2)",
+          background: "var(--bg-card)",
+          border: "1px solid var(--border)",
         }}
       >
-        <Layers size={28} style={{ color: "#2dd4bf" }} />
+        <Layers size={24} style={{ color: "var(--accent)" }} />
       </div>
       <h2 className="text-xl font-semibold mb-2">No knowledge spaces yet</h2>
       <p
@@ -157,11 +153,7 @@ function EmptyState({ onCreateSpace }: { onCreateSpace: () => void }) {
       <button
         id="empty-create-space-btn"
         onClick={onCreateSpace}
-        className="mt-6 inline-flex items-center gap-2 px-6 py-2.5 rounded-xl text-sm font-medium transition-all hover:opacity-90"
-        style={{
-          background: "linear-gradient(135deg, #0d9488, #0891b2)",
-          color: "#fff",
-        }}
+        className="primary-button mt-6"
       >
         <Plus size={15} />
         Create your first space

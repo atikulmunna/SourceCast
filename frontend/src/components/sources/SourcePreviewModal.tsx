@@ -112,8 +112,7 @@ export function SourcePreviewModal({
             className="fixed inset-0 z-50 flex items-center justify-center p-4"
           >
             <div
-              className="w-full max-w-lg rounded-2xl p-6 gradient-border"
-              style={{ background: "var(--bg-card)" }}
+              className="surface w-full max-w-lg p-6"
             >
               {/* Header */}
               <div className="flex items-center justify-between mb-5">
@@ -146,7 +145,7 @@ export function SourcePreviewModal({
                     onChange={(e) => setUrl(e.target.value)}
                     onKeyDown={(e) => e.key === "Enter" && handlePreview()}
                     placeholder="https://youtube.com/watch?v=..."
-                    className="w-full pl-9 pr-4 py-2.5 rounded-xl text-sm outline-none"
+                    className="w-full pl-9 pr-4 py-2.5 rounded-md text-sm outline-none"
                     style={{
                       background: "var(--bg-secondary)",
                       border: "1px solid var(--border)",
@@ -158,11 +157,7 @@ export function SourcePreviewModal({
                   id="preview-url-btn"
                   onClick={handlePreview}
                   disabled={loading || !url.trim()}
-                  className="px-4 py-2.5 rounded-xl text-sm font-medium transition-all hover:opacity-90 disabled:opacity-40"
-                  style={{
-                    background: "linear-gradient(135deg, #0d9488, #0891b2)",
-                    color: "#fff",
-                  }}
+                  className="primary-button disabled:opacity-40"
                 >
                   {loading ? (
                     <Loader2 size={15} className="animate-spin" />
@@ -192,7 +187,7 @@ export function SourcePreviewModal({
                 <motion.div
                   initial={{ opacity: 0, y: 8 }}
                   animate={{ opacity: 1, y: 0 }}
-                  className="rounded-xl overflow-hidden"
+                  className="rounded-lg overflow-hidden"
                   style={{ border: "1px solid var(--border)" }}
                 >
                   {/* Thumbnail */}
@@ -246,7 +241,7 @@ export function SourcePreviewModal({
                         <div className="flex items-center gap-1.5 mb-1 font-medium">
                           <Clock size={12} />
                           Estimated processing time:{" "}
-                          <span style={{ color: "#2dd4bf" }}>
+                          <span style={{ color: "var(--accent-strong)" }}>
                             {preview.processing_estimate.estimated_label}
                           </span>
                         </div>
@@ -276,11 +271,7 @@ export function SourcePreviewModal({
                       id="ingest-source-btn"
                       onClick={handleIngest}
                       disabled={ingesting || !spaceId}
-                      className="w-full py-2.5 rounded-xl text-sm font-semibold transition-all hover:opacity-90 disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center gap-2"
-                      style={{
-                        background: "linear-gradient(135deg, #0d9488, #0891b2)",
-                        color: "#fff",
-                      }}
+                      className="primary-button w-full disabled:opacity-40 disabled:cursor-not-allowed"
                       title={spaceId ? "Start ingestion" : "Open a space first"}
                     >
                       {ingesting ? (
