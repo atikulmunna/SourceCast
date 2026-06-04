@@ -5,8 +5,8 @@ Downloads audio to a temporary local path via yt-dlp, then deletes it
 according to the source's audio_storage_policy after transcription completes.
 """
 
+import asyncio
 import logging
-import os
 import uuid
 from pathlib import Path
 from typing import Any
@@ -30,6 +30,9 @@ def _build_ydl_opts(output_path: str) -> dict[str, Any]:
         "quiet": True,
         "no_warnings": True,
         "noplaylist": True,
+        "socket_timeout": 60,
+        "retries": 3,
+        "fragment_retries": 3,
         "format": "bestaudio/best",
         "outtmpl": output_path,
         "postprocessors": [
@@ -40,6 +43,11 @@ def _build_ydl_opts(output_path: str) -> dict[str, Any]:
             }
         ],
     }
+
+
+def _run_download(source_url: str, opts: dict[str, Any]) -> None:
+    with yt_dlp.YoutubeDL(opts) as ydl:
+        ydl.download([source_url])
 
 
 async def download_audio(source_url: str, job_id: uuid.UUID) -> Path:
@@ -55,10 +63,7 @@ async def download_audio(source_url: str, job_id: uuid.UUID) -> Path:
     logger.info("Downloading audio for job %s from %s", job_id, source_url)
 
     try:
-        # yt-dlp is synchronous — run in thread pool via asyncio would be ideal,
-        # but for simplicity in MVP we call it directly (the worker runs in its own process)
-        with yt_dlp.YoutubeDL(opts) as ydl:
-            ydl.download([source_url])
+        await asyncio.to_thread(_run_download, source_url, opts)
     except yt_dlp.utils.DownloadError as exc:
         raise RuntimeError(format_ytdlp_error(exc, "download audio")) from exc
 

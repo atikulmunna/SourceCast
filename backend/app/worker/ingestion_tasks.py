@@ -133,7 +133,15 @@ async def ingest_source(
             source.status = "PROCESSING"
             await db.commit()
 
-            audio_path = await audio_service.download_audio(source.source_url, job_uuid)
+            heartbeat_stop = asyncio.Event()
+            heartbeat_task = asyncio.create_task(
+                _heartbeat_until_stopped(db, job, heartbeat_stop)
+            )
+            try:
+                audio_path = await audio_service.download_audio(source.source_url, job_uuid)
+            finally:
+                heartbeat_stop.set()
+                await heartbeat_task
             source.audio_file_url = str(audio_path)
             await db.commit()
 
