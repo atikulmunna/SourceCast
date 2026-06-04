@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import { useQuery } from "@tanstack/react-query";
 import { motion } from "framer-motion";
 import { Layers, Plus, BookOpen, Zap } from "lucide-react";
@@ -13,8 +14,10 @@ import { SourcePreviewModal } from "@/components/sources/SourcePreviewModal";
 
 export default function AppDashboard() {
   const { user } = useAuthStore();
+  const router = useRouter();
   const [showCreateSpace, setShowCreateSpace] = useState(false);
   const [showAddSource, setShowAddSource] = useState(false);
+  const [selectedSpaceId, setSelectedSpaceId] = useState<string>("");
 
   const {
     data: spaces = [],
@@ -27,6 +30,15 @@ export default function AppDashboard() {
       return data;
     },
   });
+
+  const activeSpaceId = selectedSpaceId || spaces[0]?.id || "";
+
+  const handleDashboardIngested = () => {
+    setShowAddSource(false);
+    if (activeSpaceId) {
+      router.push(`/app/spaces/${activeSpaceId}`);
+    }
+  };
 
   return (
     <div className="p-8 max-w-5xl mx-auto">
@@ -56,6 +68,7 @@ export default function AppDashboard() {
         <button
           id="add-source-btn"
           onClick={() => setShowAddSource(true)}
+          disabled={!activeSpaceId}
           className="secondary-button"
           style={{
             background: "var(--bg-card)",
@@ -66,6 +79,24 @@ export default function AppDashboard() {
           <Plus size={16} />
           Add Source
         </button>
+        {spaces.length > 0 && (
+          <select
+            value={activeSpaceId}
+            onChange={(event) => setSelectedSpaceId(event.target.value)}
+            className="h-10 rounded-md px-3 text-sm outline-none"
+            style={{
+              background: "var(--bg-card)",
+              border: "1px solid var(--border)",
+              color: "var(--text-secondary)",
+            }}
+          >
+            {spaces.map((space) => (
+              <option key={space.id} value={space.id}>
+                {space.name}
+              </option>
+            ))}
+          </select>
+        )}
       </div>
 
       {/* Spaces grid */}
@@ -108,6 +139,8 @@ export default function AppDashboard() {
       <SourcePreviewModal
         open={showAddSource}
         onClose={() => setShowAddSource(false)}
+        spaceId={activeSpaceId}
+        onIngested={handleDashboardIngested}
       />
     </div>
   );
