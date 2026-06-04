@@ -15,6 +15,7 @@ import aiofiles.os
 import yt_dlp
 
 from app.core.config import settings
+from app.services.ytdlp_errors import format_ytdlp_error
 
 logger = logging.getLogger(__name__)
 
@@ -59,7 +60,7 @@ async def download_audio(source_url: str, job_id: uuid.UUID) -> Path:
         with yt_dlp.YoutubeDL(opts) as ydl:
             ydl.download([source_url])
     except yt_dlp.utils.DownloadError as exc:
-        raise RuntimeError(f"Audio download failed: {exc}") from exc
+        raise RuntimeError(format_ytdlp_error(exc, "download audio")) from exc
 
     # yt-dlp produces <stem>.mp3 after FFmpeg post-processing
     audio_path = Path(stem + ".mp3")

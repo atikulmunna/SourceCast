@@ -14,6 +14,7 @@ import yt_dlp
 from app.core.config import settings
 from app.core.exceptions import UnprocessableException
 from app.schemas.sources import ProcessingEstimate, SourcePreviewResponse
+from app.services.ytdlp_errors import format_ytdlp_error
 
 
 # Duration threshold above which we show a long-content warning (2 hours)
@@ -92,7 +93,7 @@ async def preview_source(
             info: dict[str, Any] = ydl.extract_info(url, download=False)
     except yt_dlp.utils.DownloadError as exc:
         raise UnprocessableException(
-            f"Could not extract metadata from this URL: {exc}"
+            format_ytdlp_error(exc, "extract metadata from this URL")
         ) from exc
     except Exception as exc:
         raise UnprocessableException(
