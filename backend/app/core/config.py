@@ -38,6 +38,10 @@ class Settings(BaseSettings):
             if len(value) < 32 or any(marker in normalized for marker in PLACEHOLDER_SECRET_MARKERS):
                 raise ValueError(f"{name} must be a strong non-placeholder secret in production")
 
+        redis_url = self.REDIS_URL.lower()
+        if "upstash.io" in redis_url and redis_url.startswith("redis://"):
+            raise ValueError("Upstash Redis requires a rediss:// TLS URL in production")
+
         return self
 
     # ── Database ──────────────────────────────────────────────────────────────

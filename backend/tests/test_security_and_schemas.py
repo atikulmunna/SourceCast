@@ -118,9 +118,33 @@ def test_production_accepts_strong_jwt_secrets() -> None:
         DEBUG=False,
         JWT_ACCESS_SECRET="access-secret-with-more-than-32-characters",
         JWT_REFRESH_SECRET="refresh-secret-with-more-than-32-characters",
+        REDIS_URL="redis://localhost:6379/0",
     )
 
     assert settings.ENVIRONMENT == "production"
+
+
+def test_production_rejects_non_tls_upstash_redis_url() -> None:
+    with pytest.raises(ValidationError, match="rediss://"):
+        Settings(
+            ENVIRONMENT="production",
+            DEBUG=False,
+            JWT_ACCESS_SECRET="access-secret-with-more-than-32-characters",
+            JWT_REFRESH_SECRET="refresh-secret-with-more-than-32-characters",
+            REDIS_URL="redis://default:secret@wealthy-shad-74894.upstash.io:6379",
+        )
+
+
+def test_production_accepts_tls_upstash_redis_url() -> None:
+    settings = Settings(
+        ENVIRONMENT="production",
+        DEBUG=False,
+        JWT_ACCESS_SECRET="access-secret-with-more-than-32-characters",
+        JWT_REFRESH_SECRET="refresh-secret-with-more-than-32-characters",
+        REDIS_URL="rediss://default:secret@wealthy-shad-74894.upstash.io:6379",
+    )
+
+    assert settings.REDIS_URL.startswith("rediss://")
 
 
 def test_migration_database_url_defaults_to_runtime_database_url() -> None:

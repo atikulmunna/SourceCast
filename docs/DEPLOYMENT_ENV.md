@@ -10,7 +10,7 @@ Use this checklist before setting `ENVIRONMENT=production`.
 | `DEBUG` | Set to `false`. |
 | `DATABASE_URL` | Use a managed or private PostgreSQL URL. |
 | `DIRECT_URL` | Optional migration-only database URL; recommended for Supabase session pooler. |
-| `REDIS_URL` | Use a managed or private Redis URL. |
+| `REDIS_URL` | Use a managed or private Redis URL; use `rediss://` for TLS providers such as Upstash. |
 | `QDRANT_URL` | Use a hosted Qdrant URL or a private service URL. |
 | `JWT_ACCESS_SECRET` | Use a random secret with at least 32 characters. |
 | `JWT_REFRESH_SECRET` | Use a different random secret with at least 32 characters. |
@@ -42,6 +42,17 @@ in either connection string.
 
 SourceCast automatically detects the Supabase transaction pooler URL and disables
 asyncpg prepared-statement caching for runtime connections.
+
+## Redis URLs
+
+Upstash Redis typically requires TLS:
+
+```env
+REDIS_URL=rediss://default:YOUR_PASSWORD@YOUR_HOST.upstash.io:6379
+```
+
+If the worker logs `Connection closed by server` while connecting to an Upstash
+host, confirm the URL starts with `rediss://` instead of `redis://`.
 
 ## Required Frontend Values
 
