@@ -8,8 +8,6 @@ from app.core.config import settings
 from app.models.ingestion_job import IngestionJob
 
 ACTIVE_JOB_STATUSES = {
-    "PENDING",
-    "QUEUED",
     "DOWNLOADING",
     "TRANSCRIBING",
     "SEGMENTING",
@@ -43,4 +41,3 @@ async def mark_stale_if_needed(
     job.current_step = "Worker heartbeat expired"
     await db.commit()
     return True
-

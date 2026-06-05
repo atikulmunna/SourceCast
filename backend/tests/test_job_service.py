@@ -54,6 +54,20 @@ async def test_mark_stale_if_needed_leaves_recent_job_active() -> None:
 
 
 @pytest.mark.asyncio
+@pytest.mark.parametrize("status", ["PENDING", "QUEUED"])
+async def test_mark_stale_if_needed_does_not_expire_waiting_jobs(status: str) -> None:
+    db = FakeDB()
+    job = active_job(datetime.now(timezone.utc) - timedelta(hours=1))
+    job.status = status
+
+    changed = await mark_stale_if_needed(db, job, stale_after_seconds=60)
+
+    assert changed is False
+    assert job.status == status
+    assert db.commits == 0
+
+
+@pytest.mark.asyncio
 async def test_mark_stale_if_needed_ignores_terminal_job() -> None:
     db = FakeDB()
     job = active_job(datetime.now(timezone.utc) - timedelta(minutes=5))
