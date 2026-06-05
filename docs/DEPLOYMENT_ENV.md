@@ -25,7 +25,7 @@ Use this checklist before setting `ENVIRONMENT=production`.
 | `GROQ_BASE_URL` | Keep the default unless Groq changes the API base URL. |
 | `LLM_PROVIDER` | Keep `extractive` for no external LLM key, or use `groq` for hosted generation. |
 | `LLM_MODEL` | Set to the hosted model name when using `groq`. |
-| `WHISPER_MODEL` | Smaller models are faster; larger models need more CPU or GPU capacity. |
+| `WHISPER_MODEL` | Use `tiny` for small Render workers; larger models need more memory, CPU, or GPU capacity. |
 
 ## Supabase Database URLs
 
@@ -53,6 +53,19 @@ REDIS_URL=rediss://default:YOUR_PASSWORD@YOUR_HOST.upstash.io:6379
 
 If the worker logs `Connection closed by server` while connecting to an Upstash
 host, confirm the URL starts with `rediss://` instead of `redis://`.
+
+## Whisper Model Size
+
+For low-memory hosted workers, keep:
+
+```env
+WHISPER_MODEL=tiny
+```
+
+If Render logs show the worker downloading `faster-whisper-base` and then the
+instance restarts without a Python traceback, the process was likely killed by
+the platform while loading the model. Upgrade the worker before using `base` or
+larger models.
 
 ## Required Frontend Values
 
