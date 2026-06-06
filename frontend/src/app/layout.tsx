@@ -1,6 +1,13 @@
 import type { Metadata } from "next";
+import { Merriweather } from "next/font/google";
 import "./globals.css";
 import { Providers } from "./providers";
+
+const merriweather = Merriweather({
+  subsets: ["latin"],
+  weight: ["300", "400", "700", "900"],
+  variable: "--font-merriweather",
+});
 
 export const metadata: Metadata = {
   title: "SourceCast — Timestamp-Cited Research Assistant",
@@ -22,7 +29,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="en">
+    <html lang="en" className={merriweather.variable}>
       <body className="antialiased">
         <Providers>{children}</Providers>
       </body>

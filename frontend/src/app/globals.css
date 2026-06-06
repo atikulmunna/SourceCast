@@ -1,9 +1,7 @@
 @import "tailwindcss";
 
 :root {
-    --font-ui:
-        -apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro Display",
-        "Segoe UI", system-ui, sans-serif;
+    --font-ui: var(--font-merriweather), Georgia, serif;
 }
 
 /* ── Design Tokens ──────────────────────────────────────────────────────────── */
@@ -91,15 +89,14 @@ body {
 .brand-mark {
     width: 30px;
     height: 30px;
-    border-radius: 8px;
     display: inline-flex;
     align-items: center;
     justify-content: center;
     position: relative;
     overflow: hidden;
-    background: linear-gradient(180deg, #ffffff, #eef3f8);
-    border: 1px solid var(--border);
-    box-shadow: var(--shadow-sm);
+    background: transparent;
+    border: 0;
+    box-shadow: none;
 }
 
 .brand-mark::before {
