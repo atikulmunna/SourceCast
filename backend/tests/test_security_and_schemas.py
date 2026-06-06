@@ -147,6 +147,19 @@ def test_production_accepts_tls_upstash_redis_url() -> None:
     assert settings.REDIS_URL.startswith("rediss://")
 
 
+def test_production_groq_transcription_requires_api_key() -> None:
+    with pytest.raises(ValidationError, match="GROQ_API_KEY"):
+        Settings(
+            ENVIRONMENT="production",
+            DEBUG=False,
+            JWT_ACCESS_SECRET="access-secret-with-more-than-32-characters",
+            JWT_REFRESH_SECRET="refresh-secret-with-more-than-32-characters",
+            REDIS_URL="redis://localhost:6379/0",
+            TRANSCRIPTION_PROVIDER="groq",
+            GROQ_API_KEY="",
+        )
+
+
 def test_migration_database_url_defaults_to_runtime_database_url() -> None:
     settings = Settings(DATABASE_URL="postgresql+asyncpg://runtime/db", DIRECT_URL="")
 

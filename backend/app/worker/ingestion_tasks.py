@@ -146,20 +146,24 @@ async def ingest_source(
             await db.commit()
 
             # ── Stage 2: TRANSCRIBING ─────────────────────────────────────────
+            from app.core.config import settings
+
             await _update_job(
                 db,
                 job,
                 status="TRANSCRIBING",
                 stage="transcription",
                 progress=15,
-                current_step="Loading Whisper model…",
+                current_step=(
+                    "Submitting audio to hosted transcription…"
+                    if settings.TRANSCRIPTION_PROVIDER == "groq"
+                    else "Loading Whisper model…"
+                ),
             )
 
             # Use source language if set, otherwise auto-detect
             lang = source.language if source.language != "auto" else None
             # Determine model from job metadata or fall back to config
-            from app.core.config import settings
-
             model_size = settings.WHISPER_MODEL
 
             def on_progress(pct: int, msg: str) -> None:

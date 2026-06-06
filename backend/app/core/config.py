@@ -42,6 +42,9 @@ class Settings(BaseSettings):
         if "upstash.io" in redis_url and redis_url.startswith("redis://"):
             raise ValueError("Upstash Redis requires a rediss:// TLS URL in production")
 
+        if self.TRANSCRIPTION_PROVIDER == "groq" and not self.GROQ_API_KEY:
+            raise ValueError("GROQ_API_KEY is required when TRANSCRIPTION_PROVIDER=groq")
+
         return self
 
     # ── Database ──────────────────────────────────────────────────────────────
@@ -78,6 +81,9 @@ class Settings(BaseSettings):
     LLM_PROVIDER: Literal["extractive", "groq"] = "extractive"
     LLM_MODEL: str = "llama-3.1-8b-instant"
     LLM_TIMEOUT_SECONDS: int = 30
+    TRANSCRIPTION_PROVIDER: Literal["local", "groq"] = "local"
+    GROQ_TRANSCRIPTION_MODEL: str = "whisper-large-v3-turbo"
+    TRANSCRIPTION_TIMEOUT_SECONDS: int = 300
     DEFAULT_EMBEDDING_MODEL: str = "all-MiniLM-L6-v2"
     DEFAULT_QDRANT_COLLECTION: str = "source_chunks_v1_minilm_384"
     WHISPER_MODEL: str = "tiny"

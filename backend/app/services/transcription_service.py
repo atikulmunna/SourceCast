@@ -1,5 +1,5 @@
 """
-Transcription service using faster-whisper.
+Transcription service using local faster-whisper or hosted Groq speech-to-text.
 
 Wraps the faster-whisper library to produce a list of timestamped segments
 from an audio file. The model is loaded once and cached on the module level
@@ -15,6 +15,10 @@ from decimal import Decimal
 from functools import lru_cache
 from pathlib import Path
 from typing import Callable
+
+import httpx
+
+from app.core.config import settings
 
 logger = logging.getLogger(__name__)
 
@@ -112,6 +116,115 @@ def transcribe_sync(
     return results
 
 
+def _confidence_from_avg_logprob(avg_logprob: float | None) -> Decimal | None:
+    if avg_logprob is None:
+        return None
+    try:
+        avg_logprob_float = float(avg_logprob)
+    except (TypeError, ValueError):
+        return None
+    conf_float = max(0.0, min(1.0, 1.0 + avg_logprob_float))
+    return Decimal(str(round(conf_float, 4)))
+
+
+def _decimal_seconds(value: object, fallback: float = 0.0) -> Decimal:
+    try:
+        seconds = float(value)  # type: ignore[arg-type]
+    except (TypeError, ValueError):
+        seconds = fallback
+    return Decimal(str(round(seconds, 3)))
+
+
+def _map_groq_segments(payload: dict) -> list[TranscriptSegmentData]:
+    raw_segments = payload.get("segments") or []
+    results: list[TranscriptSegmentData] = []
+
+    for raw in raw_segments:
+        if not isinstance(raw, dict):
+            continue
+        text = str(raw.get("text") or "").strip()
+        if not text:
+            continue
+        results.append(
+            TranscriptSegmentData(
+                segment_index=len(results),
+                start_time_sec=_decimal_seconds(raw.get("start")),
+                end_time_sec=_decimal_seconds(raw.get("end")),
+                text=text,
+                confidence_score=_confidence_from_avg_logprob(raw.get("avg_logprob")),
+            )
+        )
+
+    if results:
+        return results
+
+    text = str(payload.get("text") or "").strip()
+    if not text:
+        return []
+
+    return [
+        TranscriptSegmentData(
+            segment_index=0,
+            start_time_sec=Decimal("0"),
+            end_time_sec=_decimal_seconds(payload.get("duration")),
+            text=text,
+            confidence_score=None,
+        )
+    ]
+
+
+async def _transcribe_with_groq(
+    audio_path: Path,
+    language: str | None = None,
+    progress_callback: Callable[[int, str], None] | None = None,
+) -> list[TranscriptSegmentData]:
+    if not settings.GROQ_API_KEY:
+        raise RuntimeError("GROQ_API_KEY is required when TRANSCRIPTION_PROVIDER=groq")
+
+    endpoint = f"{settings.GROQ_BASE_URL.rstrip('/')}/audio/transcriptions"
+    data: dict[str, object] = {
+        "model": settings.GROQ_TRANSCRIPTION_MODEL,
+        "response_format": "verbose_json",
+        "temperature": "0",
+        "timestamp_granularities[]": "segment",
+    }
+    if language and language != "auto":
+        data["language"] = language
+
+    if progress_callback:
+        progress_callback(20, "Uploading audio for hosted transcription")
+
+    logger.info(
+        "Transcribing %s with Groq model=%s language=%s",
+        audio_path.name,
+        settings.GROQ_TRANSCRIPTION_MODEL,
+        language or "auto",
+    )
+
+    try:
+        with audio_path.open("rb") as audio_file:
+            files = {"file": (audio_path.name, audio_file, "application/octet-stream")}
+            async with httpx.AsyncClient(timeout=settings.TRANSCRIPTION_TIMEOUT_SECONDS) as client:
+                response = await client.post(
+                    endpoint,
+                    headers={"Authorization": f"Bearer {settings.GROQ_API_KEY}"},
+                    data=data,
+                    files=files,
+                )
+                response.raise_for_status()
+    except httpx.HTTPStatusError as exc:
+        body = exc.response.text[:500]
+        raise RuntimeError(f"Groq transcription failed: {exc.response.status_code} {body}") from exc
+    except httpx.HTTPError as exc:
+        raise RuntimeError(f"Groq transcription request failed: {exc}") from exc
+
+    segments = _map_groq_segments(response.json())
+    if progress_callback:
+        progress_callback(95, f"Hosted transcription complete: {len(segments)} segments")
+    logger.info("Groq transcription complete: %d segments", len(segments))
+    return segments
+
+
 async def transcribe(
     audio_path: Path,
     model_size: str = "base",
@@ -122,6 +235,9 @@ async def transcribe(
     Async wrapper: runs transcription in the default executor so the
     event loop is not blocked during the CPU-intensive Whisper inference.
     """
+    if settings.TRANSCRIPTION_PROVIDER == "groq":
+        return await _transcribe_with_groq(audio_path, language, progress_callback)
+
     loop = asyncio.get_event_loop()
     return await loop.run_in_executor(
         None,

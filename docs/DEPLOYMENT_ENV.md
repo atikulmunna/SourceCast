@@ -25,6 +25,9 @@ Use this checklist before setting `ENVIRONMENT=production`.
 | `GROQ_BASE_URL` | Keep the default unless Groq changes the API base URL. |
 | `LLM_PROVIDER` | Keep `extractive` for no external LLM key, or use `groq` for hosted generation. |
 | `LLM_MODEL` | Set to the hosted model name when using `groq`. |
+| `TRANSCRIPTION_PROVIDER` | Use `local` for local faster-whisper or `groq` for hosted transcription. |
+| `GROQ_TRANSCRIPTION_MODEL` | Use `whisper-large-v3-turbo` for fast hosted transcription, or `whisper-large-v3` for higher accuracy. |
+| `TRANSCRIPTION_TIMEOUT_SECONDS` | HTTP timeout for hosted transcription requests. |
 | `WHISPER_MODEL` | Use `tiny` for small Render workers; larger models need more memory, CPU, or GPU capacity. |
 
 ## Supabase Database URLs
@@ -66,6 +69,21 @@ If Render logs show the worker downloading `faster-whisper-base` and then the
 instance restarts without a Python traceback, the process was likely killed by
 the platform while loading the model. Upgrade the worker before using `base` or
 larger models.
+
+## Hosted Transcription
+
+Small Render workers may also restart while loading `faster-whisper-tiny`. In
+that case, offload transcription to Groq on both the web service and the
+background worker:
+
+```env
+TRANSCRIPTION_PROVIDER=groq
+GROQ_API_KEY=your-groq-api-key
+GROQ_TRANSCRIPTION_MODEL=whisper-large-v3-turbo
+TRANSCRIPTION_TIMEOUT_SECONDS=300
+```
+
+When `TRANSCRIPTION_PROVIDER=groq`, `WHISPER_MODEL` is ignored for ingestion.
 
 ## Required Frontend Values
 
