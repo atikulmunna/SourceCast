@@ -15,6 +15,7 @@ from __future__ import annotations
 import logging
 import uuid
 from datetime import datetime, timezone
+from pathlib import Path
 
 from arq import create_pool
 from arq.connections import RedisSettings
@@ -77,11 +78,18 @@ async def create_source_and_enqueue(
             Source.canonical_url == canonical_url,
         )
     )
-    if existing.scalar_one_or_none():
-        raise ConflictException(
-            "You have already added this source. "
-            "Find it in your library or delete it before re-ingesting."
+    existing_source = existing.scalar_one_or_none()
+    if existing_source:
+        link_result = await db.execute(
+            select(SourceSpace).where(SourceSpace.source_id == existing_source.id).limit(1)
         )
+        if link_result.scalar_one_or_none():
+            raise ConflictException(
+                "You have already added this source. "
+                "Find it in your library or delete it before re-ingesting."
+            )
+
+        await _delete_orphan_source(db, existing_source)
 
     # ── Create Source ─────────────────────────────────────────────────────────
     source = Source(
@@ -161,3 +169,31 @@ async def create_source_and_enqueue(
         await db.commit()
 
     return source, job
+
+
+async def _delete_orphan_source(db: AsyncSession, source: Source) -> None:
+    """
+    Remove a user-owned source that is no longer attached to any workspace.
+
+    This can happen when a workspace is deleted: the SourceSpace rows cascade
+    away, but the user-level source row still exists and would otherwise block
+    re-ingestion through the canonical URL uniqueness guard.
+    """
+    if source.audio_file_url:
+        try:
+            from app.services.audio_service import delete_audio
+
+            await delete_audio(Path(source.audio_file_url))
+        except Exception as exc:
+            logger.warning("Audio cleanup failed for orphan source %s: %s", source.id, exc)
+
+    try:
+        from app.services import qdrant_service
+
+        await qdrant_service.delete_by_source(settings.DEFAULT_QDRANT_COLLECTION, source.id)
+    except Exception as exc:
+        logger.warning("Vector cleanup failed for orphan source %s: %s", source.id, exc)
+
+    logger.info("Deleting orphan source %s before re-ingestion", source.id)
+    await db.delete(source)
+    await db.flush()
