@@ -1,28 +1,20 @@
 "use client";
 
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useAuthStore } from "@/store/authStore";
 
-function AuthInitializer({ children }: { children: React.ReactNode }) {
+function AuthBootstrap({ children }: { children: React.ReactNode }) {
   const initialize = useAuthStore((s) => s.initialize);
-  const [ready, setReady] = useState(false);
+  const initialized = useRef(false);
 
   useEffect(() => {
-    initialize().finally(() => setReady(true));
+    if (initialized.current) {
+      return;
+    }
+    initialized.current = true;
+    void initialize();
   }, [initialize]);
-
-  if (!ready) {
-    return (
-      <div className="loading-screen">
-        <div className="loading-panel" role="status" aria-live="polite">
-          <div className="brand-mark brand-mark-lg" aria-hidden="true" />
-          <div className="loading-title">SourceCast</div>
-          <div className="loading-caption">Preparing your workspace</div>
-        </div>
-      </div>
-    );
-  }
 
   return <>{children}</>;
 }
@@ -45,7 +37,7 @@ export function Providers({ children }: { children: React.ReactNode }) {
 
   return (
     <QueryClientProvider client={queryClient}>
-      <AuthInitializer>{children}</AuthInitializer>
+      <AuthBootstrap>{children}</AuthBootstrap>
     </QueryClientProvider>
   );
 }
