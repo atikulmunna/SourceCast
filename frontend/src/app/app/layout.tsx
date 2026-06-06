@@ -17,11 +17,12 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
 
   if (isLoading || !isAuthenticated) {
     return (
-      <div
-        className="min-h-screen flex items-center justify-center"
-        style={{ background: "var(--bg-primary)" }}
-      >
-        <div className="brand-mark" aria-label="Loading workspace" />
+      <div className="loading-screen">
+        <div className="loading-panel" role="status" aria-live="polite">
+          <div className="brand-mark brand-mark-lg" aria-hidden="true" />
+          <div className="loading-title">SourceCast</div>
+          <div className="loading-caption">Opening workspace</div>
+        </div>
       </div>
     );
   }

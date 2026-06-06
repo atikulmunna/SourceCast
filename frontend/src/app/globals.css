@@ -87,8 +87,8 @@ body {
 
 /* ── Shared UI Utilities ─────────────────────────────────────────────────────── */
 .brand-mark {
-    width: 30px;
-    height: 30px;
+    width: 36px;
+    height: 36px;
     display: inline-flex;
     align-items: center;
     justify-content: center;
@@ -102,29 +102,80 @@ body {
 .brand-mark::before {
     content: "";
     position: absolute;
-    inset: 7px;
+    inset: 8px;
     border-radius: 50%;
-    border: 1px solid rgba(183, 215, 199, 0.82);
+    border: 2px solid rgba(0, 122, 255, 0.72);
     box-shadow:
-        0 0 0 5px rgba(0, 122, 255, 0.08),
-        inset 0 0 0 4px rgba(0, 122, 255, 0.07);
+        0 0 0 6px rgba(0, 122, 255, 0.08),
+        inset 0 0 0 4px rgba(0, 122, 255, 0.1);
     animation: sourcePulse 3.2s ease-in-out infinite;
 }
 
 .brand-mark::after {
     content: "";
     position: absolute;
-    left: 8px;
-    right: 8px;
-    top: 14px;
-    height: 2px;
+    left: 9px;
+    right: 9px;
+    top: 17px;
+    height: 3px;
     border-radius: 999px;
     background: var(--accent);
     box-shadow:
-        -4px -5px 0 -0.5px rgba(183, 215, 199, 0.55),
-        4px 5px 0 -0.5px rgba(183, 215, 199, 0.45);
+        -5px -6px 0 -1px rgba(0, 94, 203, 0.52),
+        5px 6px 0 -1px rgba(0, 122, 255, 0.4);
     transform-origin: center;
     animation: sourceScan 2.6s ease-in-out infinite;
+}
+
+.brand-mark-lg {
+    width: 64px;
+    height: 64px;
+}
+
+.brand-mark-lg::before {
+    inset: 14px;
+    border-width: 2px;
+    box-shadow:
+        0 0 0 10px rgba(0, 122, 255, 0.08),
+        inset 0 0 0 7px rgba(0, 122, 255, 0.1);
+}
+
+.brand-mark-lg::after {
+    left: 16px;
+    right: 16px;
+    top: 30px;
+    height: 4px;
+    box-shadow:
+        -8px -10px 0 -1.5px rgba(0, 94, 203, 0.52),
+        8px 10px 0 -1.5px rgba(0, 122, 255, 0.4);
+}
+
+.loading-screen {
+    min-height: 100vh;
+    display: grid;
+    place-items: center;
+    background:
+        radial-gradient(circle at 50% 42%, rgba(255, 255, 255, 0.85), transparent 28rem),
+        var(--bg-primary);
+}
+
+.loading-panel {
+    display: grid;
+    justify-items: center;
+    gap: 12px;
+    text-align: center;
+}
+
+.loading-title {
+    margin-top: 6px;
+    font-size: 18px;
+    font-weight: 700;
+    letter-spacing: -0.01em;
+}
+
+.loading-caption {
+    font-size: 13px;
+    color: var(--text-muted);
 }
 
 .surface {
