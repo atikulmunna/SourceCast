@@ -14,6 +14,10 @@ export interface TokenResponse {
   expires_in: number;
 }
 
+export interface AuthResponse extends TokenResponse {
+  user: User;
+}
+
 export interface KnowledgeSpace {
   id: string;
   user_id: string;

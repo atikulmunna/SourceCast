@@ -23,7 +23,7 @@ from app.core.security import (
 )
 from app.models.refresh_token import RefreshToken
 from app.models.user import User
-from app.schemas.auth import RegisterRequest, TokenResponse, UserOut
+from app.schemas.auth import RegisterRequest, UserOut
 
 
 class AuthService:
@@ -49,9 +49,9 @@ class AuthService:
 
     async def login(
         self, email: str, password: str, request: Request | None = None
-    ) -> tuple[str, str]:
+    ) -> tuple[str, str, UserOut]:
         """
-        Returns (access_token, raw_refresh_token).
+        Returns (access_token, raw_refresh_token, user).
         Caller is responsible for setting the cookie.
         """
         result = await self.db.execute(select(User).where(User.email == email))
@@ -75,7 +75,7 @@ class AuthService:
         self.db.add(rt)
         await self.db.commit()
 
-        return access_token, raw_refresh
+        return access_token, raw_refresh, UserOut.model_validate(user)
 
     async def refresh(self, raw_token: str, request: Request | None = None) -> tuple[str, str]:
         """

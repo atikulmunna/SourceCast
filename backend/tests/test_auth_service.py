@@ -91,10 +91,11 @@ async def test_login_issues_access_and_refresh_tokens(monkeypatch: pytest.Monkey
     monkeypatch.setattr(auth_service, "generate_refresh_token", lambda: "refresh-token")
     monkeypatch.setattr(auth_service, "hash_refresh_token", lambda value: "refresh-hash")
 
-    access, refresh = await AuthService(db).login(existing.email, "research123")
+    access, refresh, logged_in_user = await AuthService(db).login(existing.email, "research123")
 
     assert access == "access-token"
     assert refresh == "refresh-token"
+    assert logged_in_user.email == existing.email
     assert db.added[0].token_hash == "refresh-hash"
 
 

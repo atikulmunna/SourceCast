@@ -2,7 +2,7 @@
 
 import { create } from "zustand";
 import api, { setSessionExpiredHandler } from "@/lib/api";
-import { User, TokenResponse } from "@/lib/types";
+import { AuthResponse, User, TokenResponse } from "@/lib/types";
 
 interface AuthState {
   user: User | null;
@@ -42,15 +42,14 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   },
 
   login: async (email: string, password: string) => {
-    const { data } = await api.post<TokenResponse>("/auth/login", {
+    const { data } = await api.post<AuthResponse>("/auth/login", {
       email,
       password,
     });
     if (typeof window !== "undefined") {
       window.__sourcecast_access_token = data.access_token;
     }
-    const { data: user } = await api.get<User>("/auth/me");
-    set({ user, isAuthenticated: true, isLoading: false });
+    set({ user: data.user, isAuthenticated: true, isLoading: false });
   },
 
   register: async (email: string, password: string, name?: string) => {

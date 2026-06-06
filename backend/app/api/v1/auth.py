@@ -2,7 +2,7 @@ from fastapi import APIRouter, Cookie, Request, Response, status
 
 from app.api.deps import CurrentUser, DBDep
 from app.core.config import settings
-from app.schemas.auth import LoginRequest, RegisterRequest, TokenResponse, UserOut
+from app.schemas.auth import AuthResponse, LoginRequest, RegisterRequest, TokenResponse, UserOut
 from app.services.auth_service import AuthService
 
 router = APIRouter(prefix="/auth", tags=["auth"])
@@ -43,20 +43,21 @@ async def register(data: RegisterRequest, db: DBDep) -> UserOut:
     return await service.register(data)
 
 
-@router.post("/login", response_model=TokenResponse)
+@router.post("/login", response_model=AuthResponse)
 async def login(
     data: LoginRequest,
     request: Request,
     response: Response,
     db: DBDep,
-) -> TokenResponse:
+) -> AuthResponse:
     """Login and receive an access token. Refresh token is set as HttpOnly cookie."""
     service = AuthService(db)
-    access_token, raw_refresh = await service.login(data.email, data.password, request)
+    access_token, raw_refresh, user = await service.login(data.email, data.password, request)
     _set_refresh_cookie(response, raw_refresh)
-    return TokenResponse(
+    return AuthResponse(
         access_token=access_token,
         expires_in=settings.ACCESS_TOKEN_EXPIRES_MINUTES * 60,
+        user=user,
     )
 
 
