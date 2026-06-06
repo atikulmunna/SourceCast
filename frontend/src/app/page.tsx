@@ -51,55 +51,59 @@ export default function LandingPage() {
     >
       <header
         className="border-b"
-        style={{ borderColor: "var(--border)", background: "var(--bg-primary)" }}
+        style={{ borderColor: "var(--border)", background: "var(--bg-secondary)" }}
       >
         <div className="mx-auto flex h-16 max-w-6xl items-center justify-between px-5">
           <Link href="/" className="flex items-center gap-3">
             <span className="brand-mark" aria-hidden="true" />
-            <span className="text-sm font-semibold tracking-[0.02em]">SourceCast</span>
+            <span className="text-sm font-semibold">SourceCast</span>
           </Link>
-          <nav className="flex items-center gap-2">
+          <nav className="flex items-center gap-2" aria-label="Primary navigation">
             <Link
               href="/login"
-              className="rounded-md px-3 py-2 text-sm"
+              className="secondary-button h-9 px-3"
               style={{ color: "var(--text-secondary)" }}
             >
               Sign in
             </Link>
-            <Link href="/register" id="cta-nav-register" className="primary-button">
+            <Link href="/register" id="cta-nav-register" className="primary-button h-9 px-4">
               Start
             </Link>
           </nav>
         </div>
       </header>
 
-      <section className="mx-auto grid max-w-6xl gap-10 px-5 py-16 lg:grid-cols-[minmax(0,1fr)_440px] lg:items-start lg:py-24">
+      <section className="mx-auto grid min-h-[calc(100vh-64px)] max-w-6xl gap-10 px-5 py-12 sm:py-16 lg:grid-cols-[minmax(0,1fr)_440px] lg:items-center">
         <div className="max-w-2xl">
-          <p className="mb-5 text-sm font-medium" style={{ color: "var(--text-muted)" }}>
+          <p className="mb-4 text-sm font-medium" style={{ color: "var(--text-muted)" }}>
             Research workspace for source-grounded audio and video notes
           </p>
-          <h1 className="text-4xl font-semibold leading-tight sm:text-5xl">
+          <h1 className="max-w-[11ch] text-5xl font-semibold leading-[1.04] tracking-tight sm:text-6xl">
             Find the part that proves the point.
           </h1>
           <p
-            className="mt-6 max-w-xl text-base leading-7"
+            className="mt-6 max-w-xl text-lg leading-8"
             style={{ color: "var(--text-secondary)" }}
           >
             SourceCast turns long-form media into timestamped transcripts, searchable evidence,
             cited answers, comparisons, saved insights, and exportable research briefs.
           </p>
           <div className="mt-8 flex flex-wrap items-center gap-3">
-            <Link href="/register" id="cta-hero-register" className="primary-button">
-              Create workspace
+            <Link
+              href="/register"
+              id="cta-hero-register"
+              className="primary-button h-11 whitespace-nowrap px-5"
+            >
+              <span>Create workspace</span>
               <ArrowRight size={15} />
             </Link>
-            <Link href="/login" className="secondary-button">
+            <Link href="/login" className="secondary-button h-11 whitespace-nowrap px-5">
               Sign in
             </Link>
           </div>
         </div>
 
-        <aside className="surface p-5">
+        <aside className="surface p-5 sm:p-6">
           <div className="mb-5 flex items-center justify-between border-b pb-4" style={{ borderColor: "var(--border)" }}>
             <div>
               <p className="text-sm font-medium">Evidence answer</p>
@@ -107,7 +111,7 @@ export default function LandingPage() {
                 Source-level question
               </p>
             </div>
-            <span className="rounded px-2 py-1 text-xs" style={{ background: "var(--bg-secondary)", color: "var(--text-muted)" }}>
+            <span className="rounded px-2 py-1 text-xs whitespace-nowrap" style={{ background: "var(--bg-secondary)", color: "var(--text-muted)" }}>
               High confidence
             </span>
           </div>
@@ -133,7 +137,7 @@ export default function LandingPage() {
         </aside>
       </section>
 
-      <section className="border-y" style={{ borderColor: "var(--border)" }}>
+      <section className="border-y" style={{ borderColor: "var(--border)", background: "var(--bg-secondary)" }}>
         <div className="mx-auto grid max-w-6xl gap-px px-5 py-10 sm:grid-cols-2 lg:grid-cols-4">
           {capabilities.map((item) => (
             <div key={item.title} className="py-5 sm:px-5">
