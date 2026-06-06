@@ -103,11 +103,11 @@ export function JobProgressPanel({ jobId, onDone }: Props) {
       <div className="flex items-center justify-between gap-3">
         <div className="flex items-center gap-2">
           {completed ? (
-            <CheckCircle2 size={17} style={{ color: "#2dd4bf" }} />
+            <CheckCircle2 size={17} style={{ color: "var(--accent-emerald)" }} />
           ) : failed ? (
-            <AlertTriangle size={17} style={{ color: "#f87171" }} />
+            <AlertTriangle size={17} style={{ color: "var(--accent-rose)" }} />
           ) : (
-            <Loader2 size={17} className="animate-spin" style={{ color: "#2dd4bf" }} />
+            <Loader2 size={17} className="animate-spin" style={{ color: "var(--accent)" }} />
           )}
           <div>
             <p className="text-sm font-medium">{job.status.replaceAll("_", " ")}</p>
@@ -136,13 +136,13 @@ export function JobProgressPanel({ jobId, onDone }: Props) {
           className="h-full transition-all"
           style={{
             width: `${Math.max(0, Math.min(100, job.progress))}%`,
-            background: failed ? "#e11d48" : "linear-gradient(90deg, #0d9488, #0891b2)",
+            background: failed ? "var(--accent-rose)" : "var(--accent)",
           }}
         />
       </div>
 
       {job.error_message && (
-        <p className="text-xs" style={{ color: "#f87171" }}>
+        <p className="text-xs" style={{ color: "var(--accent-rose)" }}>
           {job.error_message}
         </p>
       )}

@@ -116,7 +116,7 @@ export function CreateSpaceModal({ open, onClose, onCreated }: Props) {
                     style={{
                       background: "rgba(225,29,72,0.08)",
                       border: "1px solid rgba(225,29,72,0.2)",
-                      color: "#f87171",
+                      color: "var(--accent-rose)",
                     }}
                   >
                     <AlertCircle size={15} />
@@ -145,7 +145,7 @@ export function CreateSpaceModal({ open, onClose, onCreated }: Props) {
                     }}
                   />
                   {errors.name && (
-                    <p className="text-xs mt-1" style={{ color: "#f87171" }}>
+                    <p className="text-xs mt-1" style={{ color: "var(--accent-rose)" }}>
                       {errors.name.message}
                     </p>
                   )}

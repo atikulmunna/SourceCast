@@ -113,7 +113,7 @@ export function SpaceChatPanel({ spaceId, enabled }: SpaceChatPanelProps) {
     <section className="mt-8 border-t pt-8" style={{ borderColor: "var(--border)" }}>
       <div className="flex items-center justify-between gap-3 mb-4">
         <div className="flex items-center gap-2">
-          <MessageSquare size={17} style={{ color: "#2dd4bf" }} />
+          <MessageSquare size={17} style={{ color: "var(--accent)" }} />
           <h2 className="text-sm font-semibold uppercase tracking-wide" style={{ color: "var(--text-muted)" }}>
             Research Chat
           </h2>
@@ -123,7 +123,7 @@ export function SpaceChatPanel({ spaceId, enabled }: SpaceChatPanelProps) {
           onClick={startNewChat}
           title="Start new chat"
           className="w-8 h-8 rounded-lg flex items-center justify-center hover:opacity-80"
-          style={{ border: "1px solid var(--border)", color: "#2dd4bf" }}
+          style={{ border: "1px solid var(--border)", color: "var(--accent)" }}
         >
           <Plus size={15} />
         </button>
@@ -132,7 +132,7 @@ export function SpaceChatPanel({ spaceId, enabled }: SpaceChatPanelProps) {
       <div className="grid gap-4 lg:grid-cols-[260px_minmax(0,1fr)]">
         <aside className="rounded-lg p-3" style={{ background: "var(--bg-card)", border: "1px solid var(--border)" }}>
           {sessionsLoading ? (
-            <Loader2 size={16} className="animate-spin" style={{ color: "#2dd4bf" }} />
+            <Loader2 size={16} className="animate-spin" style={{ color: "var(--accent)" }} />
           ) : sessions.length === 0 ? (
             <p className="text-sm" style={{ color: "var(--text-muted)" }}>No saved chats yet.</p>
           ) : (
@@ -142,7 +142,7 @@ export function SpaceChatPanel({ spaceId, enabled }: SpaceChatPanelProps) {
                   key={item.id}
                   className="rounded-lg p-2"
                   style={{
-                    background: item.id === session?.id ? "rgba(13,148,136,0.12)" : "var(--bg-secondary)",
+                    background: item.id === session?.id ? "rgba(0,122,255,0.1)" : "var(--bg-secondary)",
                     border: "1px solid var(--border)",
                   }}
                 >
@@ -159,7 +159,7 @@ export function SpaceChatPanel({ spaceId, enabled }: SpaceChatPanelProps) {
                       onClick={() => deleteSession(item.id)}
                       title="Delete chat"
                       className="w-7 h-7 shrink-0 rounded-lg flex items-center justify-center hover:opacity-80"
-                      style={{ color: "#f87171", border: "1px solid var(--border)" }}
+                      style={{ color: "var(--accent-rose)", border: "1px solid var(--border)" }}
                     >
                       <Trash2 size={13} />
                     </button>
@@ -220,7 +220,7 @@ export function SpaceChatPanel({ spaceId, enabled }: SpaceChatPanelProps) {
               disabled={!enabled || asking || !question.trim()}
               title="Send question"
               className="w-10 h-10 rounded-lg flex items-center justify-center disabled:opacity-40"
-              style={{ background: "#0d9488", color: "#fff" }}
+              style={{ background: "var(--accent)", color: "#fff" }}
             >
               {asking ? <Loader2 size={16} className="animate-spin" /> : <Send size={16} />}
             </button>
@@ -228,7 +228,7 @@ export function SpaceChatPanel({ spaceId, enabled }: SpaceChatPanelProps) {
         </div>
       </div>
 
-      {error && <p className="text-sm mt-3" style={{ color: "#f87171" }}>{error}</p>}
+      {error && <p className="text-sm mt-3" style={{ color: "var(--accent-rose)" }}>{error}</p>}
     </section>
   );
 }
@@ -239,7 +239,7 @@ function ChatBubble({ message, spaceId }: { message: ChatMessage; spaceId: strin
     <div className={isUser ? "flex justify-end" : "max-w-3xl"}>
       <div
         className={isUser ? "rounded-lg px-3 py-2 max-w-xl" : ""}
-        style={isUser ? { background: "rgba(13,148,136,0.14)" } : undefined}
+        style={isUser ? { background: "rgba(0,122,255,0.1)" } : undefined}
       >
         <div className="flex items-start gap-2">
           <p className="text-sm leading-relaxed flex-1">{message.content}</p>
@@ -254,7 +254,7 @@ function ChatBubble({ message, spaceId }: { message: ChatMessage; spaceId: strin
                 style={{ background: "var(--bg-secondary)", border: "1px solid var(--border)" }}
               >
                 <div className="flex items-center justify-between gap-2 mb-1 text-xs">
-                  <span className="flex items-center gap-2" style={{ color: "#2dd4bf" }}>
+                  <span className="flex items-center gap-2" style={{ color: "var(--accent)" }}>
                     <span className="flex items-center gap-1">
                       <Clock size={12} />
                       {formatTimestamp(Number(item.start_time_sec))} - {formatTimestamp(Number(item.end_time_sec))}

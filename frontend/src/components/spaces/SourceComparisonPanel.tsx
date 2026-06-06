@@ -47,7 +47,7 @@ export function SourceComparisonPanel({ sources, spaceId }: { sources: Source[];
   return (
     <section className="mt-8 border-t pt-8" style={{ borderColor: "var(--border)" }}>
       <div className="flex items-center gap-2 mb-4">
-        <GitCompareArrows size={17} style={{ color: "#2dd4bf" }} />
+        <GitCompareArrows size={17} style={{ color: "var(--accent)" }} />
         <h2 className="text-sm font-semibold uppercase tracking-wide" style={{ color: "var(--text-muted)" }}>
           Compare Sources
         </h2>
@@ -94,7 +94,7 @@ export function SourceComparisonPanel({ sources, spaceId }: { sources: Source[];
                 type="submit"
                 disabled={selectedIds.length < 2 || !topic.trim() || comparing}
                 className="px-4 py-2 rounded-lg text-sm font-medium flex items-center gap-2 disabled:opacity-40"
-                style={{ background: "#0d9488", color: "#fff" }}
+                style={{ background: "var(--accent)", color: "#fff" }}
               >
                 {comparing && <Loader2 size={15} className="animate-spin" />}
                 Compare
@@ -104,7 +104,7 @@ export function SourceComparisonPanel({ sources, spaceId }: { sources: Source[];
         )}
       </form>
 
-      {error && <p className="text-sm mt-3" style={{ color: "#f87171" }}>{error}</p>}
+      {error && <p className="text-sm mt-3" style={{ color: "var(--accent-rose)" }}>{error}</p>}
 
       {comparison && (
         <div className="mt-4 space-y-4">
@@ -140,7 +140,7 @@ function EvidenceRow({ item, spaceId }: { item: EvidenceHit; spaceId: string }) 
   return (
     <div className="rounded-lg p-3" style={{ background: "var(--bg-secondary)", border: "1px solid var(--border)" }}>
       <div className="flex items-center justify-between gap-2 mb-1 text-xs">
-        <span className="flex items-center gap-2" style={{ color: "#2dd4bf" }}>
+        <span className="flex items-center gap-2" style={{ color: "var(--accent)" }}>
           <span className="flex items-center gap-1">
             <Clock size={12} />
             {formatTimestamp(Number(item.start_time_sec))} - {formatTimestamp(Number(item.end_time_sec))}

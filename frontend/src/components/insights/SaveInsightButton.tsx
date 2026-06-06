@@ -53,7 +53,14 @@ export function SaveInsightButton({
       disabled={saving || saved}
       title={saved ? "Saved insight" : failed ? "Save failed. Try again" : "Save insight"}
       className="w-7 h-7 shrink-0 rounded-lg flex items-center justify-center disabled:opacity-60 hover:opacity-80"
-      style={{ color: saved ? "#2dd4bf" : failed ? "#f87171" : "var(--text-muted)", border: "1px solid var(--border)" }}
+      style={{
+        color: saved
+          ? "var(--accent-emerald)"
+          : failed
+            ? "var(--accent-rose)"
+            : "var(--text-muted)",
+        border: "1px solid var(--border)",
+      }}
     >
       {saving ? <Loader2 size={13} className="animate-spin" /> : saved ? <BookmarkCheck size={13} /> : failed ? <CircleAlert size={13} /> : <BookmarkPlus size={13} />}
     </button>

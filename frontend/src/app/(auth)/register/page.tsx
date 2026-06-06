@@ -5,7 +5,6 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { motion } from "framer-motion";
 import {
   Mail,
   Lock,
@@ -62,12 +61,7 @@ export default function RegisterPage() {
       className="min-h-screen flex items-center justify-center px-4 py-12"
       style={{ background: "var(--bg-primary)" }}
     >
-      <motion.div
-        initial={{ opacity: 0, y: 24 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.4 }}
-        className="w-full max-w-md"
-      >
+      <div className="w-full max-w-md animate-fade-in">
         {/* Logo */}
         <div className="text-center mb-8">
           <div className="inline-flex items-center gap-2 mb-4">
@@ -95,7 +89,7 @@ export default function RegisterPage() {
                 style={{
                   background: "rgba(225,29,72,0.08)",
                   border: "1px solid rgba(225,29,72,0.2)",
-                  color: "#f87171",
+                  color: "var(--accent-rose)",
                 }}
               >
                 <AlertCircle size={15} />
@@ -132,7 +126,7 @@ export default function RegisterPage() {
                 />
               </div>
               {errors.name && (
-                <p className="text-xs mt-1" style={{ color: "#f87171" }}>
+                <p className="text-xs mt-1" style={{ color: "var(--accent-rose)" }}>
                   {errors.name.message}
                 </p>
               )}
@@ -167,7 +161,7 @@ export default function RegisterPage() {
                 />
               </div>
               {errors.email && (
-                <p className="text-xs mt-1" style={{ color: "#f87171" }}>
+                <p className="text-xs mt-1" style={{ color: "var(--accent-rose)" }}>
                   {errors.email.message}
                 </p>
               )}
@@ -259,7 +253,7 @@ export default function RegisterPage() {
             Sign in
           </Link>
         </p>
-      </motion.div>
+      </div>
     </div>
   );
 }

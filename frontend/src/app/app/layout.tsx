@@ -21,7 +21,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
         className="min-h-screen flex items-center justify-center"
         style={{ background: "var(--bg-primary)" }}
       >
-        <div className="w-8 h-8 border-2 border-teal-500 border-t-transparent rounded-full animate-spin" />
+        <div className="brand-mark" aria-label="Loading workspace" />
       </div>
     );
   }

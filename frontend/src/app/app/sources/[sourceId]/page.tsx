@@ -127,7 +127,7 @@ export default function SourceDetailPage() {
             <span
               className="px-3 py-1.5 rounded-full text-xs font-medium"
               style={{
-                background: ready ? "rgba(143,185,168,0.12)" : "rgba(161,161,181,0.08)",
+                background: ready ? "rgba(52,199,89,0.12)" : "rgba(60,60,67,0.08)",
                 color: ready ? "var(--accent-strong)" : "var(--text-secondary)",
               }}
             >
@@ -138,7 +138,7 @@ export default function SourceDetailPage() {
               disabled={deleting}
               title="Delete source"
               className="w-8 h-8 rounded-lg flex items-center justify-center disabled:opacity-40"
-              style={{ border: "1px solid var(--border)", color: "#f87171" }}
+              style={{ border: "1px solid var(--border)", color: "var(--accent-rose)" }}
             >
               {deleting ? <Loader2 size={15} className="animate-spin" /> : <Trash2 size={15} />}
             </button>
@@ -225,7 +225,7 @@ export default function SourceDetailPage() {
           </form>
 
           {askError && (
-            <p className="text-sm mt-4" style={{ color: "#f87171" }}>
+            <p className="text-sm mt-4" style={{ color: "var(--accent-rose)" }}>
               {askError}
             </p>
           )}

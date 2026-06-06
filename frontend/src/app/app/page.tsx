@@ -3,7 +3,6 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { useQuery } from "@tanstack/react-query";
-import { motion } from "framer-motion";
 import { Layers, Plus, BookOpen, Zap } from "lucide-react";
 import api from "@/lib/api";
 import { KnowledgeSpace } from "@/lib/types";
@@ -41,22 +40,15 @@ export default function AppDashboard() {
   };
 
   return (
-    <div className="p-8 max-w-5xl mx-auto">
-      {/* Header */}
-      <motion.div
-        initial={{ opacity: 0, y: 16 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.4 }}
-        className="mb-10"
-      >
+    <div className="p-6 sm:p-8 max-w-5xl mx-auto animate-fade-in">
+      <div className="mb-8">
         <p className="text-sm mb-1" style={{ color: "var(--text-muted)" }}>
           Welcome back, {user?.name || user?.email?.split("@")[0]}
         </p>
-        <h1 className="text-3xl font-semibold">Research workspace</h1>
-      </motion.div>
+        <h1 className="text-3xl font-semibold tracking-tight">Research workspace</h1>
+      </div>
 
-      {/* Action bar */}
-      <div className="flex items-center gap-3 mb-8">
+      <div className="flex flex-wrap items-center gap-3 mb-8">
         <button
           id="create-space-btn"
           onClick={() => setShowCreateSpace(true)}
@@ -105,8 +97,7 @@ export default function AppDashboard() {
           {[...Array(3)].map((_, i) => (
             <div
               key={i}
-              className="h-36 rounded-xl animate-pulse"
-              style={{ background: "var(--bg-card)" }}
+              className="h-36 rounded-xl skeleton"
             />
           ))}
         </div>
@@ -114,15 +105,12 @@ export default function AppDashboard() {
         <EmptyState onCreateSpace={() => setShowCreateSpace(true)} />
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-          {spaces.map((space, i) => (
-            <motion.div
+          {spaces.map((space) => (
+            <div
               key={space.id}
-              initial={{ opacity: 0, y: 16 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.3, delay: i * 0.06 }}
             >
               <SpaceCard space={space} onDeleted={refetch} />
-            </motion.div>
+            </div>
           ))}
         </div>
       )}
@@ -148,12 +136,7 @@ export default function AppDashboard() {
 
 function EmptyState({ onCreateSpace }: { onCreateSpace: () => void }) {
   return (
-    <motion.div
-      initial={{ opacity: 0 }}
-      animate={{ opacity: 1 }}
-      transition={{ duration: 0.5 }}
-      className="text-center py-20"
-    >
+    <div className="text-center py-20 animate-fade-in">
       <div
         className="inline-flex w-14 h-14 rounded-lg items-center justify-center mb-5"
         style={{
@@ -191,6 +174,6 @@ function EmptyState({ onCreateSpace }: { onCreateSpace: () => void }) {
         <Plus size={15} />
         Create your first space
       </button>
-    </motion.div>
+    </div>
   );
 }

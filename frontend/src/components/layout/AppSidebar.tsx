@@ -3,7 +3,6 @@
 import { useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { motion, AnimatePresence } from "framer-motion";
 import {
   Layers,
   Plus,
@@ -83,24 +82,15 @@ export function AppSidebar() {
               </button>
             </div>
 
-            <AnimatePresence>
-              {spaces.map((space) => (
-                <motion.div
-                  key={space.id}
-                  initial={{ opacity: 0, x: -8 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  exit={{ opacity: 0, x: -8 }}
-                  transition={{ duration: 0.2 }}
-                >
-                  <SidebarLink
-                    href={`/app/spaces/${space.id}`}
-                    icon={<Layers size={14} />}
-                    label={space.name}
-                    active={pathname === `/app/spaces/${space.id}`}
-                  />
-                </motion.div>
-              ))}
-            </AnimatePresence>
+            {spaces.map((space) => (
+              <SidebarLink
+                key={space.id}
+                href={`/app/spaces/${space.id}`}
+                icon={<Layers size={14} />}
+                label={space.name}
+                active={pathname === `/app/spaces/${space.id}`}
+              />
+            ))}
 
             {spaces.length === 0 && (
               <p

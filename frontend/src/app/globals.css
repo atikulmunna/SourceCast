@@ -1,38 +1,42 @@
-@import url("https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap");
 @import "tailwindcss";
 
 :root {
-    --font-inter: "Inter", sans-serif;
+    --font-ui:
+        -apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro Display",
+        "Segoe UI", system-ui, sans-serif;
 }
 
 /* ── Design Tokens ──────────────────────────────────────────────────────────── */
 :root {
-    --bg-primary: #0b0d0e;
-    --bg-secondary: #111416;
-    --bg-card: #15191b;
-    --bg-card-hover: #1b2023;
-    --border: #273034;
-    --border-subtle: #1d2528;
+    --bg-primary: #f5f5f7;
+    --bg-secondary: rgba(246, 246, 248, 0.82);
+    --bg-card: rgba(255, 255, 255, 0.78);
+    --bg-card-hover: rgba(255, 255, 255, 0.95);
+    --bg-elevated: rgba(255, 255, 255, 0.92);
+    --border: rgba(60, 60, 67, 0.16);
+    --border-subtle: rgba(60, 60, 67, 0.09);
 
-    --text-primary: #eef1ef;
-    --text-secondary: #a8b0ad;
-    --text-muted: #737d7a;
+    --text-primary: #1d1d1f;
+    --text-secondary: rgba(29, 29, 31, 0.72);
+    --text-muted: rgba(60, 60, 67, 0.56);
 
-    --accent: #8fb9a8;
-    --accent-strong: #b7d7c7;
-    --accent-teal: #6aa995;
-    --accent-teal-light: #8fb9a8;
-    --accent-teal-glow: rgba(143, 185, 168, 0.18);
+    --accent: #007aff;
+    --accent-strong: #005ecb;
+    --accent-teal: #30b0a0;
+    --accent-teal-light: #5ac8b8;
+    --accent-teal-glow: rgba(0, 122, 255, 0.14);
 
-    --accent-cyan: #0891b2;
-    --accent-emerald: #059669;
-    --accent-amber: #d97706;
-    --accent-rose: #e11d48;
+    --accent-cyan: #32ade6;
+    --accent-emerald: #34c759;
+    --accent-amber: #ff9f0a;
+    --accent-rose: #ff3b30;
 
     --radius-sm: 6px;
-    --radius-md: 10px;
-    --radius-lg: 16px;
-    --radius-xl: 24px;
+    --radius-md: 8px;
+    --radius-lg: 12px;
+    --radius-xl: 16px;
+    --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.04);
+    --shadow-md: 0 10px 30px rgba(0, 0, 0, 0.08);
 }
 
 /* ── Base Reset ─────────────────────────────────────────────────────────────── */
@@ -47,11 +51,12 @@ html {
 }
 
 body {
-    font-family: var(--font-inter);
+    font-family: var(--font-ui);
     background-color: var(--bg-primary);
     color: var(--text-primary);
     line-height: 1.5;
     -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
 }
 
 /* ── Scrollbar ─────────────────────────────────────────────────────────────── */
@@ -60,14 +65,14 @@ body {
     height: 6px;
 }
 ::-webkit-scrollbar-track {
-    background: var(--bg-secondary);
+    background: transparent;
 }
 ::-webkit-scrollbar-thumb {
-    background: var(--border);
+    background: rgba(60, 60, 67, 0.22);
     border-radius: 3px;
 }
 ::-webkit-scrollbar-thumb:hover {
-    background: #1a2e2b;
+    background: rgba(60, 60, 67, 0.34);
 }
 
 /* ── Selection ─────────────────────────────────────────────────────────────── */
@@ -86,14 +91,15 @@ body {
 .brand-mark {
     width: 30px;
     height: 30px;
-    border-radius: 6px;
+    border-radius: 8px;
     display: inline-flex;
     align-items: center;
     justify-content: center;
     position: relative;
     overflow: hidden;
-    background: #1a2322;
+    background: linear-gradient(180deg, #ffffff, #eef3f8);
     border: 1px solid var(--border);
+    box-shadow: var(--shadow-sm);
 }
 
 .brand-mark::before {
@@ -103,9 +109,9 @@ body {
     border-radius: 50%;
     border: 1px solid rgba(183, 215, 199, 0.82);
     box-shadow:
-        0 0 0 5px rgba(143, 185, 168, 0.07),
-        inset 0 0 0 4px rgba(143, 185, 168, 0.08);
-    animation: sourcePulse 2.4s ease-in-out infinite;
+        0 0 0 5px rgba(0, 122, 255, 0.08),
+        inset 0 0 0 4px rgba(0, 122, 255, 0.07);
+    animation: sourcePulse 3.2s ease-in-out infinite;
 }
 
 .brand-mark::after {
@@ -116,18 +122,20 @@ body {
     top: 14px;
     height: 2px;
     border-radius: 999px;
-    background: var(--accent-strong);
+    background: var(--accent);
     box-shadow:
         -4px -5px 0 -0.5px rgba(183, 215, 199, 0.55),
         4px 5px 0 -0.5px rgba(183, 215, 199, 0.45);
     transform-origin: center;
-    animation: sourceScan 1.8s ease-in-out infinite;
+    animation: sourceScan 2.6s ease-in-out infinite;
 }
 
 .surface {
     border: 1px solid var(--border);
     border-radius: 8px;
     background: var(--bg-card);
+    box-shadow: var(--shadow-sm);
+    backdrop-filter: blur(18px);
 }
 
 .primary-button,
@@ -137,9 +145,9 @@ body {
     justify-content: center;
     gap: 8px;
     border-radius: 6px;
-    padding: 9px 14px;
+    padding: 8px 13px;
     font-size: 14px;
-    font-weight: 600;
+    font-weight: 500;
     transition:
         background-color 0.15s ease,
         border-color 0.15s ease,
@@ -147,22 +155,44 @@ body {
 }
 
 .primary-button {
-    background: #d7e7df;
-    color: #101412;
+    background: var(--accent);
+    color: white;
+    box-shadow: 0 1px 2px rgba(0, 122, 255, 0.2);
 }
 
 .primary-button:hover {
-    background: #c5dace;
+    background: var(--accent-strong);
 }
 
 .secondary-button {
     border: 1px solid var(--border);
     color: var(--text-secondary);
+    background: var(--bg-elevated);
 }
 
 .secondary-button:hover {
-    border-color: #3a474b;
+    border-color: rgba(0, 122, 255, 0.32);
     color: var(--text-primary);
+}
+
+.skeleton {
+    position: relative;
+    overflow: hidden;
+    background: rgba(60, 60, 67, 0.08);
+}
+
+.skeleton::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    transform: translateX(-100%);
+    background: linear-gradient(
+        90deg,
+        transparent,
+        rgba(255, 255, 255, 0.68),
+        transparent
+    );
+    animation: skeletonSweep 1.4s ease-in-out infinite;
 }
 
 /* ── Animations ─────────────────────────────────────────────────────────────── */
@@ -206,9 +236,25 @@ body {
         transform: translateY(3px) scaleX(1);
     }
 }
+@keyframes skeletonSweep {
+    100% {
+        transform: translateX(100%);
+    }
+}
 .animate-fade-in {
     animation: fadeIn 0.3s ease forwards;
 }
 .animate-slide-in {
     animation: slideInLeft 0.25s ease forwards;
+}
+
+@media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+        scroll-behavior: auto !important;
+        transition-duration: 0.01ms !important;
+    }
 }

@@ -2,7 +2,6 @@
 
 import Link from "next/link";
 import { useState } from "react";
-import { motion } from "framer-motion";
 import { Layers, MoreHorizontal, Trash2, ArrowRight } from "lucide-react";
 import api from "@/lib/api";
 import { KnowledgeSpace } from "@/lib/types";
@@ -32,13 +31,10 @@ export function SpaceCard({ space, onDeleted }: Props) {
 
   return (
     <Link href={`/app/spaces/${space.id}`} className="block group">
-      <motion.div
-        whileHover={{ scale: 1.02 }}
-        transition={{ duration: 0.15 }}
-        className="relative rounded-xl p-5 h-36 flex flex-col justify-between cursor-pointer transition-all"
+      <div
+        className="surface relative p-5 h-36 flex flex-col justify-between cursor-pointer transition-all hover:-translate-y-0.5 hover:shadow-md"
         style={{
           background: "var(--bg-card)",
-          border: "1px solid var(--border)",
         }}
       >
         {/* Top row */}
@@ -46,11 +42,11 @@ export function SpaceCard({ space, onDeleted }: Props) {
           <div
             className="w-9 h-9 rounded-lg flex items-center justify-center"
             style={{
-              background: "rgba(13,148,136,0.1)",
-              border: "1px solid rgba(13,148,136,0.15)",
+              background: "rgba(0,122,255,0.08)",
+              border: "1px solid rgba(0,122,255,0.14)",
             }}
           >
-            <Layers size={16} style={{ color: "#2dd4bf" }} />
+            <Layers size={16} style={{ color: "var(--accent)" }} />
           </div>
 
           {/* Menu button */}
@@ -71,7 +67,7 @@ export function SpaceCard({ space, onDeleted }: Props) {
               <div
                 className="absolute right-0 top-8 w-40 rounded-xl py-1 z-10 shadow-xl"
                 style={{
-                  background: "var(--bg-card)",
+                  background: "var(--bg-elevated)",
                   border: "1px solid var(--border)",
                 }}
               >
@@ -79,7 +75,7 @@ export function SpaceCard({ space, onDeleted }: Props) {
                   onClick={handleDelete}
                   disabled={deleting}
                   className="w-full flex items-center gap-2 px-3 py-2 text-sm transition-colors hover:opacity-80"
-                  style={{ color: "#f87171" }}
+                  style={{ color: "var(--accent-rose)" }}
                 >
                   <Trash2 size={14} />
                   {deleting ? "Deleting…" : "Delete space"}
@@ -104,13 +100,13 @@ export function SpaceCard({ space, onDeleted }: Props) {
           ) : (
             <p
               className="text-xs flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-all"
-              style={{ color: "#2dd4bf" }}
+              style={{ color: "var(--accent)" }}
             >
               Open space <ArrowRight size={11} />
             </p>
           )}
         </div>
-      </motion.div>
+      </div>
     </Link>
   );
 }

@@ -71,7 +71,7 @@ export function ResearchBriefsPanel({ spaceId, sources }: { spaceId: string; sou
   return (
     <section className="mt-8 border-t pt-8" style={{ borderColor: "var(--border)" }}>
       <div className="flex items-center gap-2 mb-4">
-        <FileText size={17} style={{ color: "#2dd4bf" }} />
+        <FileText size={17} style={{ color: "var(--accent)" }} />
         <h2 className="text-sm font-semibold uppercase tracking-wide" style={{ color: "var(--text-muted)" }}>
           Research Briefs
         </h2>
@@ -121,19 +121,19 @@ export function ResearchBriefsPanel({ spaceId, sources }: { spaceId: string; sou
           type="submit"
           disabled={!title.trim() || generating}
           className="px-4 py-2 rounded-lg text-sm font-medium flex items-center gap-2 disabled:opacity-40"
-          style={{ background: "#0d9488", color: "#fff" }}
+          style={{ background: "var(--accent)", color: "#fff" }}
         >
           {generating && <Loader2 size={15} className="animate-spin" />}
           Generate Markdown
         </button>
       </form>
 
-      {error && <p className="text-sm mt-3" style={{ color: "#f87171" }}>{error}</p>}
+      {error && <p className="text-sm mt-3" style={{ color: "var(--accent-rose)" }}>{error}</p>}
 
       <div className="mt-4 grid gap-4 lg:grid-cols-[300px_minmax(0,1fr)]">
         <div className="space-y-2">
           {isLoading ? (
-            <Loader2 size={16} className="animate-spin" style={{ color: "#2dd4bf" }} />
+            <Loader2 size={16} className="animate-spin" style={{ color: "var(--accent)" }} />
           ) : briefs.length === 0 ? (
             <p className="text-sm" style={{ color: "var(--text-muted)" }}>
               Generated Markdown briefs will appear here.
@@ -150,7 +150,7 @@ export function ResearchBriefsPanel({ spaceId, sources }: { spaceId: string; sou
                     onClick={() => exportMarkdown(brief.id)}
                     title="Download Markdown"
                     className="w-8 h-8 rounded-lg flex items-center justify-center hover:opacity-80"
-                    style={{ border: "1px solid var(--border)", color: "#2dd4bf" }}
+                    style={{ border: "1px solid var(--border)", color: "var(--accent)" }}
                   >
                     <Download size={14} />
                   </button>
@@ -159,7 +159,7 @@ export function ResearchBriefsPanel({ spaceId, sources }: { spaceId: string; sou
                     onClick={() => remove(brief.id)}
                     title="Delete brief"
                     className="w-8 h-8 rounded-lg flex items-center justify-center hover:opacity-80"
-                    style={{ border: "1px solid var(--border)", color: "#f87171" }}
+                    style={{ border: "1px solid var(--border)", color: "var(--accent-rose)" }}
                   >
                     <Trash2 size={14} />
                   </button>

@@ -174,7 +174,7 @@ export function SourcePreviewModal({
                   style={{
                     background: "rgba(225,29,72,0.08)",
                     border: "1px solid rgba(225,29,72,0.2)",
-                    color: "#f87171",
+                    color: "var(--accent-rose)",
                   }}
                 >
                   <AlertTriangle size={15} className="shrink-0 mt-0.5" />

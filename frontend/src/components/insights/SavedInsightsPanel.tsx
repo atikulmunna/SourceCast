@@ -24,7 +24,7 @@ export function SavedInsightsPanel({ spaceId }: { spaceId: string }) {
     <section className="mt-8 border-t pt-8" style={{ borderColor: "var(--border)" }}>
       <div className="flex items-center justify-between gap-3 mb-4">
         <div className="flex items-center gap-2">
-          <Bookmark size={17} style={{ color: "#2dd4bf" }} />
+          <Bookmark size={17} style={{ color: "var(--accent)" }} />
           <h2 className="text-sm font-semibold uppercase tracking-wide" style={{ color: "var(--text-muted)" }}>
             Saved Insights
           </h2>
@@ -33,7 +33,7 @@ export function SavedInsightsPanel({ spaceId }: { spaceId: string }) {
       </div>
 
       {isLoading ? (
-        <Loader2 size={16} className="animate-spin" style={{ color: "#2dd4bf" }} />
+        <Loader2 size={16} className="animate-spin" style={{ color: "var(--accent)" }} />
       ) : insights.length === 0 ? (
         <p className="text-sm" style={{ color: "var(--text-muted)" }}>
           Save useful answers or evidence cards to collect research notes here.
@@ -49,7 +49,7 @@ export function SavedInsightsPanel({ spaceId }: { spaceId: string }) {
                   onClick={() => remove(insight.id)}
                   title="Delete saved insight"
                   className="w-7 h-7 shrink-0 rounded-lg flex items-center justify-center hover:opacity-80"
-                  style={{ color: "#f87171", border: "1px solid var(--border)" }}
+                  style={{ color: "var(--accent-rose)", border: "1px solid var(--border)" }}
                 >
                   <Trash2 size={13} />
                 </button>
