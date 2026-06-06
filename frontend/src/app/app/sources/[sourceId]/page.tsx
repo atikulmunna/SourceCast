@@ -2,7 +2,7 @@
 
 import { FormEvent, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { ArrowLeft, Clock, ExternalLink, Loader2, Search, Trash2 } from "lucide-react";
 import Link from "next/link";
 import api from "@/lib/api";
@@ -13,10 +13,12 @@ import {
   TranscriptSegment,
   getErrorMessage,
 } from "@/lib/types";
+import { syncDeletedSource } from "@/lib/sourceCache";
 
 export default function SourceDetailPage() {
   const { sourceId } = useParams<{ sourceId: string }>();
   const router = useRouter();
+  const queryClient = useQueryClient();
   const [page, setPage] = useState(1);
   const [question, setQuestion] = useState("");
   const [answer, setAnswer] = useState<AskQuestionResponse | null>(null);
@@ -70,6 +72,7 @@ export default function SourceDetailPage() {
     setDeleting(true);
     try {
       await api.delete(`/sources/${sourceId}`);
+      await syncDeletedSource(queryClient, sourceId);
       router.push("/app");
     } catch (err) {
       setAskError(getErrorMessage(err));
