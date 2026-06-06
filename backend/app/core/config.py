@@ -84,6 +84,7 @@ class Settings(BaseSettings):
     TRANSCRIPTION_PROVIDER: Literal["local", "groq"] = "local"
     GROQ_TRANSCRIPTION_MODEL: str = "whisper-large-v3-turbo"
     TRANSCRIPTION_TIMEOUT_SECONDS: int = 300
+    EMBEDDING_PROVIDER: Literal["sentence-transformers", "hash"] = "sentence-transformers"
     DEFAULT_EMBEDDING_MODEL: str = "all-MiniLM-L6-v2"
     DEFAULT_QDRANT_COLLECTION: str = "source_chunks_v1_minilm_384"
     WHISPER_MODEL: str = "tiny"

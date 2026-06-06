@@ -5,6 +5,7 @@ import pytest
 
 from app.services import audio_service
 from app.services.audio_service import delete_audio, download_audio
+from app.services import embedding_service
 from app.services.embedding_service import embed_texts_sync
 
 
@@ -55,3 +56,22 @@ def test_embed_texts_returns_empty_without_loading_model(monkeypatch: pytest.Mon
     monkeypatch.setattr("app.services.embedding_service._load_model", fail_if_loaded)
 
     assert embed_texts_sync([]) == []
+
+
+def test_hash_embeddings_do_not_load_sentence_transformer(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(embedding_service.settings, "EMBEDDING_PROVIDER", "hash")
+    monkeypatch.setattr(
+        embedding_service,
+        "_load_model",
+        lambda model_name: pytest.fail("hash embeddings should not load a model"),
+    )
+
+    vectors = embed_texts_sync(["rocket launch", "rocket launch", "deep ocean"])
+
+    assert len(vectors) == 3
+    assert len(vectors[0]) == 384
+    assert vectors[0] == vectors[1]
+    assert vectors[0] != vectors[2]
+    assert sum(value * value for value in vectors[0]) == pytest.approx(1.0)

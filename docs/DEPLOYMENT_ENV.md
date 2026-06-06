@@ -28,6 +28,7 @@ Use this checklist before setting `ENVIRONMENT=production`.
 | `TRANSCRIPTION_PROVIDER` | Use `local` for local faster-whisper or `groq` for hosted transcription. |
 | `GROQ_TRANSCRIPTION_MODEL` | Use `whisper-large-v3-turbo` for fast hosted transcription, or `whisper-large-v3` for higher accuracy. |
 | `TRANSCRIPTION_TIMEOUT_SECONDS` | HTTP timeout for hosted transcription requests. |
+| `EMBEDDING_PROVIDER` | Use `hash` on small hosted workers, or `sentence-transformers` when the worker can load MiniLM. |
 | `WHISPER_MODEL` | Use `tiny` for small Render workers; larger models need more memory, CPU, or GPU capacity. |
 
 ## Supabase Database URLs
@@ -84,6 +85,22 @@ TRANSCRIPTION_TIMEOUT_SECONDS=300
 ```
 
 When `TRANSCRIPTION_PROVIDER=groq`, `WHISPER_MODEL` is ignored for ingestion.
+
+## Hosted Worker Embeddings
+
+Small Render workers can also restart while loading the local
+`sentence-transformers/all-MiniLM-L6-v2` embedding model. For the MVP demo path,
+use deterministic hash embeddings instead:
+
+```env
+EMBEDDING_PROVIDER=hash
+DEFAULT_EMBEDDING_MODEL=all-MiniLM-L6-v2
+DEFAULT_QDRANT_COLLECTION=source_chunks_v1_minilm_384
+```
+
+Hash embeddings keep Qdrant indexing and retrieval working without loading a
+local ML model. Use `EMBEDDING_PROVIDER=sentence-transformers` again when the
+backend runs on a worker with enough memory for MiniLM.
 
 ## Required Frontend Values
 

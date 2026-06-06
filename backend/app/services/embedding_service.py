@@ -1,5 +1,5 @@
 """
-Embedding service using sentence-transformers.
+Embedding service using sentence-transformers or a lightweight hash provider.
 
 Loads the configured embedding model once (LRU-cached) and exposes both
 a synchronous and an async interface. The sync variant runs in the default
@@ -11,13 +11,46 @@ Default model: sentence-transformers/all-MiniLM-L6-v2 (384 dims, Cosine)
 from __future__ import annotations
 
 import asyncio
+import hashlib
 import logging
 from functools import lru_cache
+import math
+import re
+
+from app.core.config import settings
 
 logger = logging.getLogger(__name__)
 
 DEFAULT_MODEL = "all-MiniLM-L6-v2"
 BATCH_SIZE = 32
+HASH_DIMENSIONS = 384
+TOKEN_PATTERN = re.compile(r"[a-z0-9]+(?:'[a-z0-9]+)?")
+
+
+def _token_features(text: str) -> list[str]:
+    tokens = TOKEN_PATTERN.findall(text.lower())
+    bigrams = [f"{left}_{right}" for left, right in zip(tokens, tokens[1:])]
+    return tokens + bigrams
+
+
+def _hash_embedding(text: str, dimensions: int = HASH_DIMENSIONS) -> list[float]:
+    vector = [0.0] * dimensions
+    features = _token_features(text)
+    if not features:
+        vector[0] = 1.0
+        return vector
+
+    for feature in features:
+        digest = hashlib.blake2b(feature.encode("utf-8"), digest_size=8).digest()
+        bucket = int.from_bytes(digest[:4], "big") % dimensions
+        sign = 1.0 if digest[4] & 1 else -1.0
+        vector[bucket] += sign
+
+    norm = math.sqrt(sum(value * value for value in vector))
+    if norm == 0:
+        vector[0] = 1.0
+        return vector
+    return [value / norm for value in vector]
 
 
 @lru_cache(maxsize=2)
@@ -49,6 +82,9 @@ def embed_texts_sync(
     """
     if not texts:
         return []
+    if settings.EMBEDDING_PROVIDER == "hash":
+        return [_hash_embedding(text) for text in texts]
+
     model = _load_model(model_name)
     embeddings = model.encode(
         texts,
