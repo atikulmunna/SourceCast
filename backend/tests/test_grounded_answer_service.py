@@ -8,6 +8,7 @@ from app.services.grounded_answer_service import (
     NO_EVIDENCE_ANSWER,
     confidence_label,
     excerpt,
+    retrieval_score_threshold,
 )
 from app.services.retrieval_service import RetrievalResult
 
@@ -78,3 +79,27 @@ def test_confidence_labels_and_excerpt_normalization() -> None:
     assert confidence_label(0.51) == "Low"
     assert excerpt("  short   excerpt  ") == "short excerpt"
     assert len(excerpt("word " * 200)) <= 500
+
+
+def test_hash_embedding_provider_uses_permissive_retrieval_threshold(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from app.services import grounded_answer_service
+
+    monkeypatch.setattr(grounded_answer_service.settings, "EMBEDDING_PROVIDER", "hash")
+
+    assert retrieval_score_threshold() == 0.0
+
+
+def test_sentence_transformer_provider_keeps_evidence_threshold(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from app.services import grounded_answer_service
+
+    monkeypatch.setattr(
+        grounded_answer_service.settings,
+        "EMBEDDING_PROVIDER",
+        "sentence-transformers",
+    )
+
+    assert retrieval_score_threshold() == 0.25

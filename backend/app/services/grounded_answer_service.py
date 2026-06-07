@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import uuid
 
+from app.core.config import settings
 from app.schemas.qa import AskQuestionResponse, EvidenceHit
 from app.services.llm_provider import AnswerProvider, get_answer_provider
 from app.services.prompt_service import build_grounded_answer_messages
@@ -28,6 +29,13 @@ def excerpt(text: str, max_chars: int = 500) -> str:
     return compact[: max_chars - 3].rstrip() + "..."
 
 
+def retrieval_score_threshold() -> float:
+    """Use a permissive threshold for hash embeddings, which are lexical and coarse."""
+    if settings.EMBEDDING_PROVIDER == "hash":
+        return 0.0
+    return 0.25
+
+
 class GroundedAnswerService:
     def __init__(
         self,
@@ -51,7 +59,7 @@ class GroundedAnswerService:
             space_id=space_id,
             source_ids=source_ids,
             limit=limit,
-            score_threshold=0.25,
+            score_threshold=retrieval_score_threshold(),
         )
         evidence = [
             EvidenceHit(
@@ -77,4 +85,3 @@ class GroundedAnswerService:
         messages = build_grounded_answer_messages(question, evidence)
         answer = await self.provider.generate(messages, evidence)
         return AskQuestionResponse(answer=answer, evidence=evidence)
-
