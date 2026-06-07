@@ -25,6 +25,7 @@ from qdrant_client.models import (
     FilterSelector,
     MatchAny,
     MatchValue,
+    PayloadSchemaType,
     PointStruct,
     ScoredPoint,
     VectorParams,
@@ -58,6 +59,8 @@ _DISTANCE_MAP: dict[str, Distance] = {
     "Euclid": Distance.EUCLID,
 }
 
+FILTER_PAYLOAD_INDEXES = ("user_id", "space_id", "source_id")
+
 
 # ── Collection management ──────────────────────────────────────────────────────
 
@@ -86,6 +89,33 @@ async def ensure_collection(
         )
     else:
         logger.debug("Qdrant collection '%s' already exists", collection_name)
+
+    await ensure_filter_indexes(collection_name)
+
+
+async def ensure_filter_indexes(collection_name: str) -> None:
+    """Ensure payload indexes exist for fields used in mandatory filters."""
+    client = get_client()
+    for field_name in FILTER_PAYLOAD_INDEXES:
+        try:
+            await client.create_payload_index(
+                collection_name=collection_name,
+                field_name=field_name,
+                field_schema=PayloadSchemaType.UUID,
+                wait=True,
+            )
+            logger.info(
+                "Ensured Qdrant payload index '%s' on collection '%s'",
+                field_name,
+                collection_name,
+            )
+        except Exception as exc:
+            logger.debug(
+                "Qdrant payload index '%s' on '%s' already exists or could not be created: %s",
+                field_name,
+                collection_name,
+                exc,
+            )
 
 
 # ── Upsert ─────────────────────────────────────────────────────────────────────

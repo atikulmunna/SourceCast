@@ -83,6 +83,25 @@ async def test_ensure_collection_creates_missing_collection(monkeypatch: pytest.
 
     client.create_collection.assert_awaited_once()
     assert client.create_collection.await_args.kwargs["collection_name"] == "chunks"
+    assert client.create_payload_index.await_count == 3
+    indexed_fields = {
+        call.kwargs["field_name"] for call in client.create_payload_index.await_args_list
+    }
+    assert indexed_fields == {"user_id", "space_id", "source_id"}
+
+
+@pytest.mark.asyncio
+async def test_ensure_collection_indexes_existing_collection(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    client = AsyncMock()
+    client.get_collections.return_value.collections = [type("Collection", (), {"name": "chunks"})()]
+    monkeypatch.setattr(qdrant_service, "get_client", lambda: client)
+
+    await qdrant_service.ensure_collection("chunks", 384)
+
+    client.create_collection.assert_not_awaited()
+    assert client.create_payload_index.await_count == 3
 
 
 @pytest.mark.asyncio
