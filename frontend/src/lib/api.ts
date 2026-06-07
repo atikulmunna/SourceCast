@@ -8,6 +8,7 @@ let sessionExpiredHandler: SessionExpiredHandler | null = null;
 export const api = axios.create({
   baseURL: `${API_URL}/api/v1`,
   withCredentials: true, // Required for HttpOnly refresh cookie
+  timeout: 30_000,
   headers: {
     "Content-Type": "application/json",
   },

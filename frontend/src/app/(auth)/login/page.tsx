@@ -5,7 +5,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Mail, Lock, AlertCircle, ArrowRight } from "lucide-react";
+import { Mail, Lock, AlertCircle, ArrowRight, Loader2 } from "lucide-react";
 import { useAuthStore } from "@/store/authStore";
 import { getErrorMessage } from "@/lib/types";
 
@@ -155,7 +155,10 @@ export default function LoginPage() {
               className="primary-button w-full disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {isSubmitting ? (
-                <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                <>
+                  <Loader2 size={16} className="animate-spin" />
+                  Connecting
+                </>
               ) : (
                 <>
                   Sign in <ArrowRight size={16} />

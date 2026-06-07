@@ -217,9 +217,18 @@ export interface ApiError {
 export function getErrorMessage(error: unknown): string {
   if (!error || typeof error !== "object") return "An unexpected error occurred";
   const err = error as {
+    code?: string;
     message?: string;
     response?: { status?: number; data?: ApiError | string };
   };
+  if (!err.response) {
+    if (err.code === "ECONNABORTED") {
+      return "The backend took too long to respond. It may still be waking up.";
+    }
+    if (err.message === "Network Error") {
+      return "Could not reach the backend. Check the API URL or wait for the service to wake up.";
+    }
+  }
   const data = err.response?.data;
   if (typeof data === "string" && data.trim()) return data;
   const detail = typeof data === "object" ? data?.detail : undefined;

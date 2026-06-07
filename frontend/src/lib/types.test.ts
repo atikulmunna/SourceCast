@@ -21,4 +21,16 @@ describe("getErrorMessage", () => {
       "The server hit an error while processing this request.",
     );
   });
+
+  it("explains network failures without a response", () => {
+    expect(getErrorMessage({ message: "Network Error" })).toContain(
+      "Could not reach the backend",
+    );
+  });
+
+  it("explains request timeouts without a response", () => {
+    expect(getErrorMessage({ code: "ECONNABORTED" })).toContain(
+      "too long to respond",
+    );
+  });
 });
