@@ -24,6 +24,8 @@ def test_system_prompt_requires_evidence_only_answers_and_citations() -> None:
     assert "must cite" in SYSTEM_PROMPT
     assert "Do not add facts from memory" in SYSTEM_PROMPT
     assert "insufficient" in SYSTEM_PROMPT
+    assert "Low confidence" in SYSTEM_PROMPT
+    assert "For identity questions" in SYSTEM_PROMPT
 
 
 def test_prompt_builder_assigns_stable_evidence_ids() -> None:
@@ -34,4 +36,3 @@ def test_prompt_builder_assigns_stable_evidence_ids() -> None:
     assert "[E1] Source: Interview" in messages[1]["content"]
     assert "Timestamp: 12.5s-18.0s" in messages[1]["content"]
     assert "What does the guest say?" in messages[1]["content"]
-

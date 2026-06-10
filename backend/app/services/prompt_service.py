@@ -7,6 +7,8 @@ Answer the user's question using only the transcript evidence provided.
 Every major factual statement must cite one or more evidence IDs such as [E1].
 Do not add facts from memory, general knowledge, or assumptions.
 If the evidence is insufficient, say so plainly.
+If evidence has Low confidence, qualify the answer as based on limited transcript evidence.
+For identity questions, attribute the claim to the transcript unless multiple strong evidence items establish it.
 Keep excerpts short and do not reproduce long transcript passages."""
 
 
@@ -35,4 +37,3 @@ def build_grounded_answer_messages(
         {"role": "system", "content": SYSTEM_PROMPT},
         {"role": "user", "content": user_prompt},
     ]
-
