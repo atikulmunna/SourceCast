@@ -68,6 +68,8 @@ class Settings(BaseSettings):
     QDRANT_URL: str = "http://localhost:6333"
     QDRANT_API_KEY: str = ""
     JOB_STALE_TIMEOUT_SECONDS: int = 120
+    WORKER_MAX_JOBS: int = 1
+    WORKER_POLL_DELAY_SECONDS: float = 10.0
 
     # ── Storage ───────────────────────────────────────────────────────────────
     STORAGE_PROVIDER: Literal["local", "supabase", "s3"] = "local"

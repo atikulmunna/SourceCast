@@ -22,7 +22,10 @@ class WorkerSettings:
     redis_settings = RedisSettings.from_dsn(settings.REDIS_URL)
 
     # Maximum number of concurrent jobs
-    max_jobs = 4
+    max_jobs = settings.WORKER_MAX_JOBS
+
+    # Slow idle polling keeps managed Redis free-tier request usage under control.
+    poll_delay = settings.WORKER_POLL_DELAY_SECONDS
 
     # Timeout per job in seconds — 2 hours for long-form content
     job_timeout = 7200

@@ -30,6 +30,8 @@ Use this checklist before setting `ENVIRONMENT=production`.
 | `TRANSCRIPTION_TIMEOUT_SECONDS` | HTTP timeout for hosted transcription requests. |
 | `EMBEDDING_PROVIDER` | Use `hash` on small hosted workers, or `sentence-transformers` when the worker can load MiniLM. |
 | `WHISPER_MODEL` | Use `tiny` for small Render workers; larger models need more memory, CPU, or GPU capacity. |
+| `WORKER_MAX_JOBS` | Keep `1` on small/free hosted workers. |
+| `WORKER_POLL_DELAY_SECONDS` | Use `10` or higher on request-metered Redis providers such as Upstash free tier. |
 
 ## Supabase Database URLs
 
@@ -57,6 +59,15 @@ REDIS_URL=rediss://default:YOUR_PASSWORD@YOUR_HOST.upstash.io:6379
 
 If the worker logs `Connection closed by server` while connecting to an Upstash
 host, confirm the URL starts with `rediss://` instead of `redis://`.
+
+If the worker logs `max requests limit exceeded`, the Redis plan has exhausted
+its request quota. Create a fresh Redis instance, wait for the quota reset, or
+upgrade the plan. Also keep the worker polling slower on request-metered Redis:
+
+```env
+WORKER_MAX_JOBS=1
+WORKER_POLL_DELAY_SECONDS=10
+```
 
 ## Whisper Model Size
 
