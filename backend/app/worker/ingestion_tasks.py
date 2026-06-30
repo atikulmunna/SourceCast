@@ -22,7 +22,12 @@ from app.models.ingestion_job import IngestionJob
 from app.models.source import Source
 from app.models.transcript_chunk import TranscriptChunk
 from app.models.transcript_segment import TranscriptSegment
-from app.services import audio_service, chunking_service, transcription_service
+from app.services import (
+    audio_service,
+    chunking_service,
+    transcription_service,
+    youtube_caption_service,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -121,75 +126,107 @@ async def ingest_source(
         job.started_at = _now()
 
         try:
-            # ── Stage 1: DOWNLOADING ──────────────────────────────────────────
-            await _update_job(
-                db,
-                job,
-                status="DOWNLOADING",
-                stage="download",
-                progress=5,
-                current_step="Downloading audio…",
-            )
             source.status = "PROCESSING"
             await db.commit()
 
-            heartbeat_stop = asyncio.Event()
-            heartbeat_task = asyncio.create_task(
-                _heartbeat_until_stopped(db, job, heartbeat_stop)
-            )
-            try:
-                audio_path = await audio_service.download_audio(source.source_url, job_uuid)
-            finally:
-                heartbeat_stop.set()
-                await heartbeat_task
-            source.audio_file_url = str(audio_path)
-            await db.commit()
-
-            # ── Stage 2: TRANSCRIBING ─────────────────────────────────────────
             from app.core.config import settings
-
-            await _update_job(
-                db,
-                job,
-                status="TRANSCRIBING",
-                stage="transcription",
-                progress=15,
-                current_step=(
-                    "Submitting audio to hosted transcription…"
-                    if settings.TRANSCRIPTION_PROVIDER == "groq"
-                    else "Loading Whisper model…"
-                ),
-            )
 
             # Use source language if set, otherwise auto-detect
             lang = source.language if source.language != "auto" else None
-            # Determine model from job metadata or fall back to config
-            model_size = settings.WHISPER_MODEL
+            segments: list[transcription_service.TranscriptSegmentData] = []
 
-            def on_progress(pct: int, msg: str) -> None:
-                """Called from the transcription thread — schedule a DB update."""
-                import asyncio
-
-                # We can't await here (we're in a sync thread), so we log only.
-                # The heartbeat loop below keeps the job alive.
-                logger.debug("Transcription progress %d%%: %s", pct, msg)
-
-            heartbeat_stop = asyncio.Event()
-            heartbeat_task = asyncio.create_task(
-                _heartbeat_until_stopped(db, job, heartbeat_stop)
-            )
-            try:
-                segments = await transcription_service.transcribe(
-                    audio_path,
-                    model_size=model_size,
-                    language=lang,
-                    progress_callback=on_progress,
+            if youtube_caption_service.is_youtube_url(source.source_url):
+                await _update_job(
+                    db,
+                    job,
+                    status="TRANSCRIBING",
+                    stage="transcription",
+                    progress=10,
+                    current_step="Checking YouTube captions…",
                 )
-            finally:
-                heartbeat_stop.set()
-                await heartbeat_task
-            source.transcript_status = "TRANSCRIBED"
-            await db.commit()
+                heartbeat_stop = asyncio.Event()
+                heartbeat_task = asyncio.create_task(
+                    _heartbeat_until_stopped(db, job, heartbeat_stop)
+                )
+                try:
+                    segments = await youtube_caption_service.extract_caption_segments(
+                        source.source_url,
+                        language=lang,
+                    )
+                except Exception as exc:
+                    logger.warning(
+                        "YouTube caption extraction failed for source %s; falling back to audio: %s",
+                        source_id,
+                        exc,
+                    )
+                finally:
+                    heartbeat_stop.set()
+                    await heartbeat_task
+
+                if segments:
+                    source.transcript_status = "TRANSCRIBED"
+                    await db.commit()
+
+            if not segments:
+                # ── Stage 1: DOWNLOADING ──────────────────────────────────────
+                await _update_job(
+                    db,
+                    job,
+                    status="DOWNLOADING",
+                    stage="download",
+                    progress=5,
+                    current_step="Downloading audio…",
+                )
+
+                heartbeat_stop = asyncio.Event()
+                heartbeat_task = asyncio.create_task(
+                    _heartbeat_until_stopped(db, job, heartbeat_stop)
+                )
+                try:
+                    audio_path = await audio_service.download_audio(source.source_url, job_uuid)
+                finally:
+                    heartbeat_stop.set()
+                    await heartbeat_task
+                source.audio_file_url = str(audio_path)
+                await db.commit()
+
+                # ── Stage 2: TRANSCRIBING ─────────────────────────────────────
+                await _update_job(
+                    db,
+                    job,
+                    status="TRANSCRIBING",
+                    stage="transcription",
+                    progress=15,
+                    current_step=(
+                        "Submitting audio to hosted transcription…"
+                        if settings.TRANSCRIPTION_PROVIDER == "groq"
+                        else "Loading Whisper model…"
+                    ),
+                )
+
+                # Determine model from job metadata or fall back to config
+                model_size = settings.WHISPER_MODEL
+
+                def on_progress(pct: int, msg: str) -> None:
+                    """Called from the transcription thread; heartbeat keeps the job alive."""
+                    logger.debug("Transcription progress %d%%: %s", pct, msg)
+
+                heartbeat_stop = asyncio.Event()
+                heartbeat_task = asyncio.create_task(
+                    _heartbeat_until_stopped(db, job, heartbeat_stop)
+                )
+                try:
+                    segments = await transcription_service.transcribe(
+                        audio_path,
+                        model_size=model_size,
+                        language=lang,
+                        progress_callback=on_progress,
+                    )
+                finally:
+                    heartbeat_stop.set()
+                    await heartbeat_task
+                source.transcript_status = "TRANSCRIBED"
+                await db.commit()
 
             # ── Stage 3: SEGMENTING ────────────────────────────────────────────
             await _update_job(

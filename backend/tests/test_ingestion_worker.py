@@ -96,6 +96,14 @@ def source_and_job():
     return source, job
 
 
+def youtube_source_and_job():
+    source, job = source_and_job()
+    source.source_type = "youtube"
+    source.source_url = "https://www.youtube.com/watch?v=abc123"
+    source.canonical_url = source.source_url
+    return source, job
+
+
 @pytest.mark.asyncio
 async def test_ingestion_worker_completes_pipeline_and_cleans_audio(
     monkeypatch: pytest.MonkeyPatch,
@@ -161,6 +169,60 @@ async def test_ingestion_worker_completes_pipeline_and_cleans_audio(
 
 
 @pytest.mark.asyncio
+async def test_ingestion_worker_uses_youtube_captions_without_downloading_audio(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    source, job = youtube_source_and_job()
+    db = FakeDB(job, source, uuid.uuid4())
+    segments = [
+        TranscriptSegmentData(
+            segment_index=0,
+            start_time_sec=Decimal("0"),
+            end_time_sec=Decimal("4"),
+            text="Caption evidence.",
+            confidence_score=None,
+        )
+    ]
+    chunks = [
+        ChunkData(
+            chunk_index=0,
+            start_time_sec=Decimal("0"),
+            end_time_sec=Decimal("4"),
+            text="Caption evidence.",
+            token_count=2,
+        )
+    ]
+    uploaded = []
+
+    monkeypatch.setattr(ingestion_tasks, "AsyncSessionLocal", lambda: db)
+    monkeypatch.setattr(
+        ingestion_tasks.youtube_caption_service,
+        "extract_caption_segments",
+        lambda *args, **kwargs: async_value(segments),
+    )
+
+    async def fail_download(*args, **kwargs):
+        raise AssertionError("captioned YouTube source should not download audio")
+
+    monkeypatch.setattr(ingestion_tasks.audio_service, "download_audio", fail_download)
+    monkeypatch.setattr(ingestion_tasks.chunking_service, "create_chunks", lambda value: chunks)
+
+    from app.services import embedding_service, qdrant_service
+
+    monkeypatch.setattr(embedding_service, "embed_texts", lambda *args, **kwargs: async_value([[0.1]]))
+    monkeypatch.setattr(qdrant_service, "ensure_collection", lambda *args: async_value(None))
+    monkeypatch.setattr(qdrant_service, "upsert_points", lambda name, points: record_async(uploaded, points, None))
+
+    await ingestion_tasks.ingest_source({}, str(job.id), str(source.id), str(source.user_id))
+
+    assert job.status == "COMPLETED"
+    assert source.status == "READY"
+    assert source.transcript_status == "TRANSCRIBED"
+    assert source.audio_file_url is None
+    assert len(uploaded[0]) == 1
+
+
+@pytest.mark.asyncio
 async def test_ingestion_worker_marks_failure_and_cleans_downloaded_audio(
     monkeypatch: pytest.MonkeyPatch,
     tmp_path: Path,
@@ -204,4 +266,3 @@ async def async_value(value):
 async def record_async(items, value, result):
     items.append(value)
     return result
-
