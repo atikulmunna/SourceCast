@@ -4,6 +4,7 @@ import yt_dlp
 from app.core.exceptions import UnprocessableException
 from app.services import source_preview_service
 from app.services.source_preview_service import (
+    _build_ydl_opts,
     _build_canonical_url,
     _detect_source_type,
     _format_duration,
@@ -53,6 +54,14 @@ def test_canonical_url_prefers_extracted_webpage_url() -> None:
         )
         == "https://example.com/canonical"
     )
+
+
+def test_preview_ytdlp_options_include_configured_cookie_file(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(source_preview_service.settings, "YTDLP_COOKIES_FILE", "/app/secrets/youtube.txt")
+
+    assert _build_ydl_opts()["cookiefile"] == "/app/secrets/youtube.txt"
 
 
 def test_youtube_bot_check_error_is_user_friendly() -> None:

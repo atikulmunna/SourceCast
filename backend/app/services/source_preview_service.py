@@ -20,14 +20,24 @@ from app.services.ytdlp_errors import format_ytdlp_error
 # Duration threshold above which we show a long-content warning (2 hours)
 LONG_CONTENT_THRESHOLD_SEC = 7200
 
-# yt-dlp options for metadata-only extraction (no download)
-_YDL_OPTS: dict[str, Any] = {
-    "quiet": True,
-    "no_warnings": True,
-    "skip_download": True,
-    "noplaylist": True,
-    "extract_flat": False,
-}
+def _with_cookiefile(opts: dict[str, Any]) -> dict[str, Any]:
+    """Attach a yt-dlp cookies file when configured for hosted extraction."""
+    if settings.YTDLP_COOKIES_FILE:
+        return {**opts, "cookiefile": settings.YTDLP_COOKIES_FILE}
+    return opts
+
+
+def _build_ydl_opts() -> dict[str, Any]:
+    """Build yt-dlp options for metadata-only extraction."""
+    return _with_cookiefile(
+        {
+            "quiet": True,
+            "no_warnings": True,
+            "skip_download": True,
+            "noplaylist": True,
+            "extract_flat": False,
+        }
+    )
 
 
 def _format_duration(seconds: int) -> str:
@@ -89,7 +99,7 @@ async def preview_source(
     model = whisper_model or settings.WHISPER_MODEL
 
     try:
-        with yt_dlp.YoutubeDL(_YDL_OPTS) as ydl:
+        with yt_dlp.YoutubeDL(_build_ydl_opts()) as ydl:
             info: dict[str, Any] = ydl.extract_info(url, download=False)
     except yt_dlp.utils.DownloadError as exc:
         raise UnprocessableException(

@@ -26,7 +26,7 @@ AUDIO_TMP_DIR.mkdir(parents=True, exist_ok=True)
 
 # yt-dlp options for audio download
 def _build_ydl_opts(output_path: str) -> dict[str, Any]:
-    return {
+    opts: dict[str, Any] = {
         "quiet": True,
         "no_warnings": True,
         "noplaylist": True,
@@ -43,6 +43,9 @@ def _build_ydl_opts(output_path: str) -> dict[str, Any]:
             }
         ],
     }
+    if settings.YTDLP_COOKIES_FILE:
+        opts["cookiefile"] = settings.YTDLP_COOKIES_FILE
+    return opts
 
 
 def _run_download(source_url: str, opts: dict[str, Any]) -> None:

@@ -30,6 +30,7 @@ frontend/coverage/
 frontend/*.tsbuildinfo
 
 # Temporary and generated files
+TASK.md
 backend/tmp/
 nul
 backend/nul

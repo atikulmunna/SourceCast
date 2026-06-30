@@ -90,6 +90,7 @@ class Settings(BaseSettings):
     DEFAULT_EMBEDDING_MODEL: str = "all-MiniLM-L6-v2"
     DEFAULT_QDRANT_COLLECTION: str = "source_chunks_v1_minilm_384"
     WHISPER_MODEL: str = "tiny"
+    YTDLP_COOKIES_FILE: str = ""
 
     # ── CORS ──────────────────────────────────────────────────────────────────
     FRONTEND_URL: str = "http://localhost:3000"
