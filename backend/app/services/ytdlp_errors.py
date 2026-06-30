@@ -6,8 +6,9 @@ from __future__ import annotations
 YOUTUBE_BOT_CHECK_MESSAGE = (
     "YouTube blocked this server-side request with a bot check. "
     "This can happen on hosted servers even when the video opens in your browser. "
-    "Try a podcast, RSS feed, or direct audio URL for now; authenticated YouTube "
-    "extraction requires a yt-dlp cookies file configured on the backend."
+    "SourceCast tries public captions first, but some videos still require "
+    "authenticated extraction. Configure a yt-dlp cookies file on the backend, "
+    "or test with a podcast, RSS feed, or direct audio URL."
 )
 
 

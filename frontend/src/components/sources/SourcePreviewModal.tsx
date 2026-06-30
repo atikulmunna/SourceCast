@@ -246,8 +246,9 @@ export function SourcePreviewModal({
                           </span>
                         </div>
                         <p style={{ color: "var(--text-muted)" }}>
-                          Using Whisper {preview.processing_estimate.model_used}{" "}
-                          on CPU
+                          {preview.source_type === "youtube"
+                            ? "YouTube captions are used first when available. Audio transcription runs only as a fallback."
+                            : "Audio transcription uses the configured speech-to-text provider."}
                         </p>
                       </div>
                     )}
