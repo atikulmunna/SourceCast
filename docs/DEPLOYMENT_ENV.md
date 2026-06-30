@@ -30,6 +30,8 @@ Use this checklist before setting `ENVIRONMENT=production`.
 | `TRANSCRIPTION_TIMEOUT_SECONDS` | HTTP timeout for hosted transcription requests. |
 | `EMBEDDING_PROVIDER` | Use `hash` on small hosted workers, or `sentence-transformers` when the worker can load MiniLM. |
 | `WHISPER_MODEL` | Use `tiny` for small Render workers; larger models need more memory, CPU, or GPU capacity. |
+| `YOUTUBE_TRANSCRIPT_LANGUAGES` | Comma-separated YouTube caption language preference order. Defaults to `en,en-US,en-GB`. |
+| `YTDLP_COOKIES_FILE` | Optional path to a Netscape-format YouTube cookies file mounted into the backend container. |
 | `WORKER_MAX_JOBS` | Keep `1` on small/free hosted workers. |
 | `WORKER_POLL_DELAY_SECONDS` | Use `10` or higher on request-metered Redis providers such as Upstash free tier. |
 
@@ -96,6 +98,28 @@ TRANSCRIPTION_TIMEOUT_SECONDS=300
 ```
 
 When `TRANSCRIPTION_PROVIDER=groq`, `WHISPER_MODEL` is ignored for ingestion.
+
+## YouTube Sources
+
+SourceCast tries YouTube captions before downloading audio. When captions are
+available, ingestion skips audio download and hosted transcription, which is
+faster and avoids many server-side bot checks.
+
+Use this language preference list on both the web service and worker:
+
+```env
+YOUTUBE_TRANSCRIPT_LANGUAGES=en,en-US,en-GB
+```
+
+Some YouTube videos still block hosted metadata or audio extraction. For those,
+mount a Netscape-format cookies file into the backend container and set:
+
+```env
+YTDLP_COOKIES_FILE=/app/secrets/youtube-cookies.txt
+```
+
+Do not commit the cookies file. Treat it like a password and rotate it if it is
+shared accidentally.
 
 ## Hosted Worker Embeddings
 
