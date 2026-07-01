@@ -2,6 +2,7 @@ import uuid
 from unittest.mock import AsyncMock
 
 import pytest
+from qdrant_client.http.exceptions import UnexpectedResponse
 
 from app.services import qdrant_service
 
@@ -102,6 +103,33 @@ async def test_ensure_collection_indexes_existing_collection(
 
     client.create_collection.assert_not_awaited()
     assert client.create_payload_index.await_count == 3
+
+
+@pytest.mark.asyncio
+async def test_ensure_collection_explains_qdrant_404(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    client = AsyncMock()
+    response = type(
+        "Response",
+        (),
+        {
+            "status_code": 404,
+            "reason_phrase": "Not Found",
+            "content": b"404 page not found",
+            "headers": {},
+        },
+    )()
+    client.get_collections.side_effect = UnexpectedResponse.for_response(response)
+    monkeypatch.setattr(qdrant_service, "get_client", lambda: client)
+    monkeypatch.setattr(
+        qdrant_service.settings,
+        "QDRANT_URL",
+        "https://console.cloud.qdrant.io/clusters/example",
+    )
+
+    with pytest.raises(RuntimeError, match="QDRANT_URL must be the Qdrant API base URL"):
+        await qdrant_service.ensure_collection("chunks", 384)
 
 
 @pytest.mark.asyncio

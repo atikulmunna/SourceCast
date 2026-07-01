@@ -16,7 +16,9 @@ from __future__ import annotations
 import logging
 import uuid
 from typing import Any
+from urllib.parse import urlparse
 
+from qdrant_client.http.exceptions import UnexpectedResponse
 from qdrant_client import AsyncQdrantClient
 from qdrant_client.models import (
     Distance,
@@ -40,11 +42,32 @@ logger = logging.getLogger(__name__)
 _client: AsyncQdrantClient | None = None
 
 
+def _normalize_qdrant_url(url: str) -> str:
+    """Return the Qdrant API base URL without a trailing slash."""
+    return url.rstrip("/")
+
+
+def _qdrant_url_hint() -> str:
+    parsed = urlparse(settings.QDRANT_URL)
+    path = parsed.path.strip("/")
+    if path:
+        return (
+            "QDRANT_URL must be the Qdrant API base URL only, without a path. "
+            "Use the cluster endpoint from Qdrant Cloud, for example "
+            "'https://your-cluster.region.cloud.qdrant.io', not a dashboard, "
+            f"collection, or URL path ending in '/{path}'."
+        )
+    return (
+        "QDRANT_URL must point to the Qdrant API base endpoint. "
+        "In Qdrant Cloud, copy the cluster endpoint URL, not the console/dashboard URL."
+    )
+
+
 def get_client() -> AsyncQdrantClient:
     global _client
     if _client is None:
         _client = AsyncQdrantClient(
-            url=settings.QDRANT_URL,
+            url=_normalize_qdrant_url(settings.QDRANT_URL),
             api_key=settings.QDRANT_API_KEY or None,
             timeout=60,
         )
@@ -72,7 +95,12 @@ async def ensure_collection(
 ) -> None:
     """Create the Qdrant collection if it does not yet exist."""
     client = get_client()
-    collections = await client.get_collections()
+    try:
+        collections = await client.get_collections()
+    except UnexpectedResponse as exc:
+        if exc.status_code == 404:
+            raise RuntimeError(_qdrant_url_hint()) from exc
+        raise
     existing = {c.name for c in collections.collections}
 
     if collection_name not in existing:
