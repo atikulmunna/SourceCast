@@ -14,9 +14,11 @@ import logging
 import re
 from decimal import Decimal
 from typing import Any
+from urllib.parse import parse_qs, urlparse
 
 import httpx
 import yt_dlp
+from youtube_transcript_api import YouTubeTranscriptApi
 
 from app.core.config import settings
 from app.services.transcription_service import TranscriptSegmentData
@@ -33,6 +35,20 @@ _VTT_TIMESTAMP_RE = re.compile(
 
 def is_youtube_url(url: str) -> bool:
     return bool(_YOUTUBE_URL_RE.search(url))
+
+
+def extract_youtube_video_id(url: str) -> str | None:
+    parsed = urlparse(url)
+    host = parsed.netloc.lower()
+    if host.endswith("youtu.be"):
+        return parsed.path.strip("/") or None
+    if "youtube" not in host:
+        return None
+    query_video_id = parse_qs(parsed.query).get("v", [None])[0]
+    if query_video_id:
+        return query_video_id
+    match = re.search(r"/(?:embed|shorts)/([^/?#]+)", parsed.path)
+    return match.group(1) if match else None
 
 
 def _decimal_seconds(seconds: float) -> Decimal:
@@ -155,6 +171,59 @@ def _language_preferences(language: str | None = None) -> list[str]:
     return list(dict.fromkeys(preferences))
 
 
+def _map_transcript_api_items(items: Any) -> list[TranscriptSegmentData]:
+    if hasattr(items, "to_raw_data"):
+        raw_items = items.to_raw_data()
+    else:
+        raw_items = list(items)
+
+    results: list[TranscriptSegmentData] = []
+    for item in raw_items:
+        if isinstance(item, dict):
+            text = str(item.get("text") or "")
+            start = item.get("start")
+            duration = item.get("duration")
+        else:
+            text = str(getattr(item, "text", "") or "")
+            start = getattr(item, "start", None)
+            duration = getattr(item, "duration", None)
+
+        text = _clean_caption_text(text)
+        if not text:
+            continue
+
+        try:
+            start_float = float(start)
+            duration_float = float(duration)
+        except (TypeError, ValueError):
+            continue
+
+        results.append(
+            TranscriptSegmentData(
+                segment_index=len(results),
+                start_time_sec=_decimal_seconds(start_float),
+                end_time_sec=_decimal_seconds(start_float + max(duration_float, 0.001)),
+                text=text,
+                confidence_score=None,
+            )
+        )
+
+    return results
+
+
+def _fetch_transcript_api_segments(
+    source_url: str,
+    language: str | None = None,
+) -> list[TranscriptSegmentData]:
+    video_id = extract_youtube_video_id(source_url)
+    if not video_id:
+        return []
+
+    api = YouTubeTranscriptApi()
+    fetched = api.fetch(video_id, languages=_language_preferences(language))
+    return _map_transcript_api_items(fetched)
+
+
 def _track_candidates(info: dict[str, Any]) -> list[tuple[str, dict[str, Any]]]:
     candidates: list[tuple[str, dict[str, Any]]] = []
     for group_name in ("subtitles", "automatic_captions"):
@@ -228,6 +297,22 @@ async def extract_caption_segments(
     """Return caption segments for a YouTube URL, or an empty list when unavailable."""
     if not is_youtube_url(source_url):
         return []
+
+    try:
+        transcript_api_segments = await asyncio.to_thread(
+            _fetch_transcript_api_segments,
+            source_url,
+            language,
+        )
+        if transcript_api_segments:
+            logger.info(
+                "Fetched %d YouTube transcript-api segments for %s",
+                len(transcript_api_segments),
+                source_url,
+            )
+            return transcript_api_segments
+    except Exception as exc:
+        logger.info("YouTube transcript-api extraction unavailable for %s: %s", source_url, exc)
 
     info = await asyncio.to_thread(_extract_info, source_url)
     track = _select_caption_track(info, language)

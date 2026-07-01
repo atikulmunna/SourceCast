@@ -7,10 +7,10 @@ from app.services.source_preview_service import (
     _build_ydl_opts,
     _build_canonical_url,
     _detect_source_type,
-    _extract_youtube_video_id,
     _format_duration,
     _format_estimate,
 )
+from app.services.youtube_caption_service import extract_youtube_video_id
 from app.services.ytdlp_errors import (
     YOUTUBE_BOT_CHECK_MESSAGE,
     format_ytdlp_error,
@@ -92,13 +92,13 @@ def test_canonical_url_prefers_extracted_webpage_url() -> None:
 
 
 def test_extract_youtube_video_id_from_common_url_shapes() -> None:
-    assert _extract_youtube_video_id("https://youtu.be/jNQXAC9IVRw") == "jNQXAC9IVRw"
+    assert extract_youtube_video_id("https://youtu.be/jNQXAC9IVRw") == "jNQXAC9IVRw"
     assert (
-        _extract_youtube_video_id("https://www.youtube.com/watch?v=jNQXAC9IVRw")
+        extract_youtube_video_id("https://www.youtube.com/watch?v=jNQXAC9IVRw")
         == "jNQXAC9IVRw"
     )
-    assert _extract_youtube_video_id("https://www.youtube.com/shorts/abc123") == "abc123"
-    assert _extract_youtube_video_id("https://example.com/watch?v=abc123") is None
+    assert extract_youtube_video_id("https://www.youtube.com/shorts/abc123") == "abc123"
+    assert extract_youtube_video_id("https://example.com/watch?v=abc123") is None
 
 
 def test_preview_ytdlp_options_include_configured_cookie_file(

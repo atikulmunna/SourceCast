@@ -5,6 +5,7 @@ import pytest
 from app.services import youtube_caption_service
 from app.services.youtube_caption_service import (
     _select_caption_track,
+    _fetch_transcript_api_segments,
     is_youtube_url,
     parse_json3_captions,
     parse_vtt_captions,
@@ -75,3 +76,36 @@ def test_select_caption_track_prefers_json3_for_configured_language(
 
     assert track is not None
     assert track["url"] == "https://example.com/en.json3"
+
+
+def test_fetch_transcript_api_segments_maps_snippets(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    captured = {}
+
+    class FakeTranscript:
+        def to_raw_data(self):
+            return [
+                {"text": "Hello <b>world</b>", "start": 0.0, "duration": 1.5},
+                {"text": "second line", "start": 2.0, "duration": 2.25},
+            ]
+
+    class FakeApi:
+        def fetch(self, video_id: str, languages: list[str]):
+            captured["video_id"] = video_id
+            captured["languages"] = languages
+            return FakeTranscript()
+
+    monkeypatch.setattr(youtube_caption_service, "YouTubeTranscriptApi", lambda: FakeApi())
+    monkeypatch.setattr(youtube_caption_service.settings, "YOUTUBE_TRANSCRIPT_LANGUAGES", "en,en-US")
+
+    segments = _fetch_transcript_api_segments(
+        "https://www.youtube.com/watch?v=jNQXAC9IVRw"
+    )
+
+    assert captured == {"video_id": "jNQXAC9IVRw", "languages": ["en", "en-US"]}
+    assert len(segments) == 2
+    assert segments[0].start_time_sec == Decimal("0.0")
+    assert segments[0].end_time_sec == Decimal("1.5")
+    assert segments[0].text == "Hello world"
+    assert segments[1].end_time_sec == Decimal("4.25")
