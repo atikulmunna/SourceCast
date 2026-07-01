@@ -8,13 +8,15 @@ without downloading the media. Returns metadata and a processing time estimate.
 import re
 from datetime import datetime, timezone
 from typing import Any
+from urllib.parse import urlencode, urlparse, parse_qs
 
+import httpx
 import yt_dlp
 
 from app.core.config import settings
 from app.core.exceptions import UnprocessableException
 from app.schemas.sources import ProcessingEstimate, SourcePreviewResponse
-from app.services.ytdlp_errors import format_ytdlp_error
+from app.services.ytdlp_errors import format_ytdlp_error, is_youtube_bot_check_error
 
 
 # Duration threshold above which we show a long-content warning (2 hours)
@@ -89,6 +91,50 @@ def _build_canonical_url(info: dict[str, Any], original_url: str) -> str | None:
     return original_url
 
 
+def _extract_youtube_video_id(url: str) -> str | None:
+    parsed = urlparse(url)
+    host = parsed.netloc.lower()
+    if host.endswith("youtu.be"):
+        return parsed.path.strip("/") or None
+    if "youtube" not in host:
+        return None
+    query_video_id = parse_qs(parsed.query).get("v", [None])[0]
+    if query_video_id:
+        return query_video_id
+    match = re.search(r"/(?:embed|shorts)/([^/?#]+)", parsed.path)
+    return match.group(1) if match else None
+
+
+async def _preview_youtube_oembed(url: str) -> SourcePreviewResponse:
+    video_id = _extract_youtube_video_id(url)
+    canonical_url = f"https://www.youtube.com/watch?v={video_id}" if video_id else url
+    endpoint = "https://www.youtube.com/oembed?" + urlencode(
+        {"url": canonical_url, "format": "json"}
+    )
+
+    try:
+        async with httpx.AsyncClient(timeout=15) as client:
+            response = await client.get(endpoint)
+            response.raise_for_status()
+            payload = response.json()
+    except httpx.HTTPError as exc:
+        raise UnprocessableException(format_ytdlp_error(exc, "extract metadata from this URL")) from exc
+
+    return SourcePreviewResponse(
+        url=url,
+        canonical_url=canonical_url,
+        source_type="youtube",
+        title=payload.get("title"),
+        creator_name=payload.get("author_name"),
+        thumbnail_url=payload.get("thumbnail_url"),
+        duration_sec=None,
+        duration_label=None,
+        publish_date=None,
+        language=None,
+        processing_estimate=None,
+    )
+
+
 async def preview_source(
     url: str, whisper_model: str | None = None
 ) -> SourcePreviewResponse:
@@ -102,6 +148,8 @@ async def preview_source(
         with yt_dlp.YoutubeDL(_build_ydl_opts()) as ydl:
             info: dict[str, Any] = ydl.extract_info(url, download=False)
     except yt_dlp.utils.DownloadError as exc:
+        if is_youtube_bot_check_error(exc) and _extract_youtube_video_id(url):
+            return await _preview_youtube_oembed(url)
         raise UnprocessableException(
             format_ytdlp_error(exc, "extract metadata from this URL")
         ) from exc
