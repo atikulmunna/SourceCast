@@ -19,6 +19,7 @@ from urllib.parse import parse_qs, urlparse
 import httpx
 import yt_dlp
 from youtube_transcript_api import YouTubeTranscriptApi
+from youtube_transcript_api.proxies import GenericProxyConfig, WebshareProxyConfig
 
 from app.core.config import settings
 from app.services.transcription_service import TranscriptSegmentData
@@ -171,6 +172,36 @@ def _language_preferences(language: str | None = None) -> list[str]:
     return list(dict.fromkeys(preferences))
 
 
+def _webshare_locations() -> list[str] | None:
+    locations = [
+        item.strip()
+        for item in settings.WEBSHARE_PROXY_LOCATIONS.split(",")
+        if item.strip()
+    ]
+    return locations or None
+
+
+def _build_transcript_api() -> YouTubeTranscriptApi:
+    if settings.WEBSHARE_PROXY_USERNAME and settings.WEBSHARE_PROXY_PASSWORD:
+        return YouTubeTranscriptApi(
+            proxy_config=WebshareProxyConfig(
+                proxy_username=settings.WEBSHARE_PROXY_USERNAME,
+                proxy_password=settings.WEBSHARE_PROXY_PASSWORD,
+                filter_ip_locations=_webshare_locations(),
+            )
+        )
+
+    if settings.YOUTUBE_TRANSCRIPT_PROXY_HTTP_URL or settings.YOUTUBE_TRANSCRIPT_PROXY_HTTPS_URL:
+        return YouTubeTranscriptApi(
+            proxy_config=GenericProxyConfig(
+                http_url=settings.YOUTUBE_TRANSCRIPT_PROXY_HTTP_URL or None,
+                https_url=settings.YOUTUBE_TRANSCRIPT_PROXY_HTTPS_URL or None,
+            )
+        )
+
+    return YouTubeTranscriptApi()
+
+
 def _map_transcript_api_items(items: Any) -> list[TranscriptSegmentData]:
     if hasattr(items, "to_raw_data"):
         raw_items = items.to_raw_data()
@@ -219,7 +250,7 @@ def _fetch_transcript_api_segments(
     if not video_id:
         return []
 
-    api = YouTubeTranscriptApi()
+    api = _build_transcript_api()
     fetched = api.fetch(video_id, languages=_language_preferences(language))
     return _map_transcript_api_items(fetched)
 
@@ -282,6 +313,8 @@ def _build_ydl_opts() -> dict[str, Any]:
     }
     if settings.YTDLP_COOKIES_FILE:
         opts["cookiefile"] = settings.YTDLP_COOKIES_FILE
+    if settings.YTDLP_PROXY_URL:
+        opts["proxy"] = settings.YTDLP_PROXY_URL
     return opts
 
 

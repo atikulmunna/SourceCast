@@ -4,6 +4,7 @@ import pytest
 
 from app.services import youtube_caption_service
 from app.services.youtube_caption_service import (
+    _build_transcript_api,
     _select_caption_track,
     _fetch_transcript_api_segments,
     is_youtube_url,
@@ -109,3 +110,71 @@ def test_fetch_transcript_api_segments_maps_snippets(
     assert segments[0].end_time_sec == Decimal("1.5")
     assert segments[0].text == "Hello world"
     assert segments[1].end_time_sec == Decimal("4.25")
+
+
+def test_build_transcript_api_uses_webshare_proxy(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    captured = {}
+
+    class FakeWebshareConfig:
+        def __init__(self, proxy_username, proxy_password, filter_ip_locations):
+            captured["webshare"] = {
+                "username": proxy_username,
+                "password": proxy_password,
+                "locations": filter_ip_locations,
+            }
+
+    class FakeApi:
+        def __init__(self, proxy_config=None):
+            captured["proxy_config"] = proxy_config
+
+    monkeypatch.setattr(youtube_caption_service, "WebshareProxyConfig", FakeWebshareConfig)
+    monkeypatch.setattr(youtube_caption_service, "YouTubeTranscriptApi", FakeApi)
+    monkeypatch.setattr(youtube_caption_service.settings, "WEBSHARE_PROXY_USERNAME", "user")
+    monkeypatch.setattr(youtube_caption_service.settings, "WEBSHARE_PROXY_PASSWORD", "pass")
+    monkeypatch.setattr(youtube_caption_service.settings, "WEBSHARE_PROXY_LOCATIONS", "us,de")
+
+    _build_transcript_api()
+
+    assert captured["webshare"] == {
+        "username": "user",
+        "password": "pass",
+        "locations": ["us", "de"],
+    }
+
+
+def test_build_transcript_api_uses_generic_proxy(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    captured = {}
+
+    class FakeGenericConfig:
+        def __init__(self, http_url=None, https_url=None):
+            captured["generic"] = {"http": http_url, "https": https_url}
+
+    class FakeApi:
+        def __init__(self, proxy_config=None):
+            captured["proxy_config"] = proxy_config
+
+    monkeypatch.setattr(youtube_caption_service, "GenericProxyConfig", FakeGenericConfig)
+    monkeypatch.setattr(youtube_caption_service, "YouTubeTranscriptApi", FakeApi)
+    monkeypatch.setattr(youtube_caption_service.settings, "WEBSHARE_PROXY_USERNAME", "")
+    monkeypatch.setattr(youtube_caption_service.settings, "WEBSHARE_PROXY_PASSWORD", "")
+    monkeypatch.setattr(
+        youtube_caption_service.settings,
+        "YOUTUBE_TRANSCRIPT_PROXY_HTTP_URL",
+        "http://proxy.example:8080",
+    )
+    monkeypatch.setattr(
+        youtube_caption_service.settings,
+        "YOUTUBE_TRANSCRIPT_PROXY_HTTPS_URL",
+        "http://proxy.example:8080",
+    )
+
+    _build_transcript_api()
+
+    assert captured["generic"] == {
+        "http": "http://proxy.example:8080",
+        "https": "http://proxy.example:8080",
+    }

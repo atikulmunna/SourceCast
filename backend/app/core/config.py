@@ -91,7 +91,13 @@ class Settings(BaseSettings):
     DEFAULT_QDRANT_COLLECTION: str = "source_chunks_v1_minilm_384"
     WHISPER_MODEL: str = "tiny"
     YTDLP_COOKIES_FILE: str = ""
+    YTDLP_PROXY_URL: str = ""
     YOUTUBE_TRANSCRIPT_LANGUAGES: str = "en,en-US,en-GB"
+    YOUTUBE_TRANSCRIPT_PROXY_HTTP_URL: str = ""
+    YOUTUBE_TRANSCRIPT_PROXY_HTTPS_URL: str = ""
+    WEBSHARE_PROXY_USERNAME: str = ""
+    WEBSHARE_PROXY_PASSWORD: str = ""
+    WEBSHARE_PROXY_LOCATIONS: str = ""
 
     # ── CORS ──────────────────────────────────────────────────────────────────
     FRONTEND_URL: str = "http://localhost:3000"

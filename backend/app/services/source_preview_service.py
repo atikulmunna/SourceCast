@@ -25,7 +25,9 @@ LONG_CONTENT_THRESHOLD_SEC = 7200
 def _with_cookiefile(opts: dict[str, Any]) -> dict[str, Any]:
     """Attach a yt-dlp cookies file when configured for hosted extraction."""
     if settings.YTDLP_COOKIES_FILE:
-        return {**opts, "cookiefile": settings.YTDLP_COOKIES_FILE}
+        opts = {**opts, "cookiefile": settings.YTDLP_COOKIES_FILE}
+    if settings.YTDLP_PROXY_URL:
+        opts = {**opts, "proxy": settings.YTDLP_PROXY_URL}
     return opts
 
 

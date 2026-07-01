@@ -32,6 +32,12 @@ Use this checklist before setting `ENVIRONMENT=production`.
 | `WHISPER_MODEL` | Use `tiny` for small Render workers; larger models need more memory, CPU, or GPU capacity. |
 | `YOUTUBE_TRANSCRIPT_LANGUAGES` | Comma-separated YouTube caption language preference order. Defaults to `en,en-US,en-GB`. |
 | `YTDLP_COOKIES_FILE` | Optional path to a Netscape-format YouTube cookies file mounted into the backend container. |
+| `YTDLP_PROXY_URL` | Optional proxy URL for yt-dlp metadata/audio requests. |
+| `YOUTUBE_TRANSCRIPT_PROXY_HTTP_URL` | Optional generic HTTP proxy URL for YouTube transcript requests. |
+| `YOUTUBE_TRANSCRIPT_PROXY_HTTPS_URL` | Optional generic HTTPS proxy URL for YouTube transcript requests. |
+| `WEBSHARE_PROXY_USERNAME` | Optional Webshare rotating residential proxy username for YouTube transcript requests. |
+| `WEBSHARE_PROXY_PASSWORD` | Optional Webshare rotating residential proxy password for YouTube transcript requests. |
+| `WEBSHARE_PROXY_LOCATIONS` | Optional comma-separated Webshare country filters, for example `us,de`. |
 | `WORKER_MAX_JOBS` | Keep `1` on small/free hosted workers. |
 | `WORKER_POLL_DELAY_SECONDS` | Use `10` or higher on request-metered Redis providers such as Upstash free tier. |
 
@@ -120,6 +126,29 @@ YTDLP_COOKIES_FILE=/app/secrets/youtube-cookies.txt
 
 Do not commit the cookies file. Treat it like a password and rotate it if it is
 shared accidentally.
+
+Render and other cloud providers may also be blocked from public YouTube
+transcript endpoints. The most reliable production option is a rotating
+residential proxy for transcript lookup. With Webshare Residential proxies, set
+these on both the web service and worker:
+
+```env
+WEBSHARE_PROXY_USERNAME=your-webshare-proxy-username
+WEBSHARE_PROXY_PASSWORD=your-webshare-proxy-password
+WEBSHARE_PROXY_LOCATIONS=us
+```
+
+For another proxy provider, use generic proxy URLs:
+
+```env
+YOUTUBE_TRANSCRIPT_PROXY_HTTP_URL=http://user:password@host:port
+YOUTUBE_TRANSCRIPT_PROXY_HTTPS_URL=http://user:password@host:port
+YTDLP_PROXY_URL=http://user:password@host:port
+```
+
+The transcript proxy is used before audio download. `YTDLP_PROXY_URL` is only
+needed when you also want yt-dlp metadata or audio fallback traffic to use the
+same proxy.
 
 ## Hosted Worker Embeddings
 

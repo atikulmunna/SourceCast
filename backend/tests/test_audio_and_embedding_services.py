@@ -83,3 +83,11 @@ def test_audio_ytdlp_options_include_configured_cookie_file(
     monkeypatch.setattr(audio_service.settings, "YTDLP_COOKIES_FILE", "/app/secrets/youtube.txt")
 
     assert audio_service._build_ydl_opts("output")["cookiefile"] == "/app/secrets/youtube.txt"
+
+
+def test_audio_ytdlp_options_include_configured_proxy(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(audio_service.settings, "YTDLP_PROXY_URL", "http://proxy.example:8080")
+
+    assert audio_service._build_ydl_opts("output")["proxy"] == "http://proxy.example:8080"

@@ -45,6 +45,8 @@ def _build_ydl_opts(output_path: str) -> dict[str, Any]:
     }
     if settings.YTDLP_COOKIES_FILE:
         opts["cookiefile"] = settings.YTDLP_COOKIES_FILE
+    if settings.YTDLP_PROXY_URL:
+        opts["proxy"] = settings.YTDLP_PROXY_URL
     return opts
 
 

@@ -109,6 +109,14 @@ def test_preview_ytdlp_options_include_configured_cookie_file(
     assert _build_ydl_opts()["cookiefile"] == "/app/secrets/youtube.txt"
 
 
+def test_preview_ytdlp_options_include_configured_proxy(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(source_preview_service.settings, "YTDLP_PROXY_URL", "http://proxy.example:8080")
+
+    assert _build_ydl_opts()["proxy"] == "http://proxy.example:8080"
+
+
 def test_youtube_bot_check_error_is_user_friendly() -> None:
     error = RuntimeError(
         "ERROR: [youtube] abc123: Sign in to confirm you're not a bot. "
