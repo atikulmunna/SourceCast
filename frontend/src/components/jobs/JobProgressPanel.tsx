@@ -16,7 +16,6 @@ interface Props {
 
 export function JobProgressPanel({ jobId, onDone }: Props) {
   const queryClient = useQueryClient();
-  const [streamFailed, setStreamFailed] = useState(false);
   const [streamVersion, setStreamVersion] = useState(0);
   const { data: job, refetch } = useQuery<Job>({
     queryKey: ["jobs", jobId],
@@ -26,7 +25,7 @@ export function JobProgressPanel({ jobId, onDone }: Props) {
     },
     refetchInterval: (query) => {
       const status = query.state.data?.status;
-      return status && TERMINAL.has(status) ? false : streamFailed ? 5000 : false;
+      return status && TERMINAL.has(status) ? false : 3000;
     },
   });
 
@@ -38,7 +37,12 @@ export function JobProgressPanel({ jobId, onDone }: Props) {
         if (!current) return current;
 
         if (event.event === "job.completed") {
-          return { ...current, status: "COMPLETED", progress: 100 };
+          return {
+            ...current,
+            status: "COMPLETED",
+            progress: 100,
+            current_step: event.message ?? "Source is ready for research.",
+          };
         }
         if (event.event === "job.failed") {
           return {
@@ -68,8 +72,8 @@ export function JobProgressPanel({ jobId, onDone }: Props) {
       });
     };
 
-    streamJobEvents(jobId, updateJob, controller.signal).catch((error) => {
-      if (error.name !== "AbortError") setStreamFailed(true);
+    streamJobEvents(jobId, updateJob, controller.signal).catch(() => {
+      // Polling continues as a fallback, so a broken stream is non-fatal.
     });
 
     return () => controller.abort();
@@ -81,7 +85,6 @@ export function JobProgressPanel({ jobId, onDone }: Props) {
 
   const retry = async () => {
     await api.post(`/jobs/${jobId}/retry`);
-    setStreamFailed(false);
     setStreamVersion((value) => value + 1);
     refetch();
   };
