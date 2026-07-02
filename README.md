@@ -1,49 +1,67 @@
 # SourceCast
 
-SourceCast is an evidence-first research workspace for podcasts, YouTube videos,
-lectures, interviews, and other long-form audio or video sources. It turns media
-into a private, searchable knowledge base with timestamped transcript evidence.
+**Live demo:** https://source-cast.vercel.app/
 
-The current MVP supports secure accounts, knowledge spaces, source preview and
-ingestion, background transcription, transcript chunking, vector indexing,
-authenticated job streaming, transcript browsing, evidence-grounded chat,
-cross-source comparison, saved insights, Markdown research briefs, timestamp
-citations, and cleanup when a source is deleted.
+SourceCast is an evidence-first research workspace for long-form audio and
+video. It turns podcasts, talks, interviews, lectures, and direct audio sources
+into timestamped transcripts, searchable evidence, and source-grounded answers.
 
-## Why SourceCast
+Instead of producing loose summaries, SourceCast keeps every answer attached to
+retrieved transcript passages so researchers can inspect the supporting context
+and jump back to the original timestamp.
 
-Long-form media contains valuable ideas, but verifying a claim inside a
-multi-hour recording is slow. SourceCast keeps research grounded by linking
-retrieved evidence to the exact transcript timestamp and preserving source
-attribution throughout the workflow.
+## What It Does
 
-## Implemented Workflow
+- Ingests supported media URLs through a background worker.
+- Transcribes audio with timestamped segments.
+- Chunks transcripts and indexes them in Qdrant.
+- Lets users ask source-scoped or workspace-scoped questions.
+- Returns answers with evidence cards, confidence labels, and timestamp links.
+- Supports private accounts, knowledge spaces, saved chats, comparisons,
+  saved insights, and Markdown research briefs.
 
-1. Register or sign in.
-2. Create a private knowledge space.
-3. Preview and ingest a supported media URL.
-4. Follow ingestion progress through authenticated Server-Sent Events.
-5. Browse paginated timestamped transcript segments.
-6. Ask source- or space-scoped questions and inspect timestamped evidence cards.
-7. Resume persisted chat sessions and save useful answers or evidence snippets.
-8. Compare indexed sources on a topic with grouped evidence and missing-evidence notices.
-9. Generate and export Markdown research briefs from saved insights and selected sources.
-10. Delete sources or chats and clean up related relational data, temporary audio, and vectors.
+## MVP Status
+
+The core research loop is live:
+
+```text
+source URL -> transcript -> chunks -> embeddings -> retrieval -> cited answer
+```
+
+Verified on the deployed backend with:
+
+- Source preview
+- Background ingestion
+- Hosted transcription
+- Transcript browsing
+- Vector indexing
+- Ask-with-evidence
+- Evidence cleanup after test workspace deletion
+
+## Current Limitations
+
+- Render cold starts can make the first backend request slow.
+- YouTube ingestion from hosted servers is unreliable without residential
+  proxies or a configured yt-dlp cookies file because YouTube often blocks
+  cloud IP addresses.
+- Podcast RSS feeds, TED pages, and direct audio URLs are the recommended demo
+  sources today.
 
 ## Architecture
 
 ```text
-Next.js frontend
-      |
-      | HTTP + authenticated SSE
-      v
-FastAPI backend
-      |
-      +-- PostgreSQL: users, spaces, sources, jobs, transcripts, chats, insights, briefs
-      +-- Redis + ARQ: asynchronous ingestion jobs
-      +-- faster-whisper: timestamped transcription
-      +-- sentence-transformers: local embeddings
-      +-- Qdrant: tenant-filtered vector retrieval
+Next.js frontend on Vercel
+        |
+        | HTTPS + authenticated requests
+        v
+FastAPI backend on Render
+        |
+        +-- PostgreSQL / Supabase: app data
+        +-- Redis / Upstash: ingestion queue
+        +-- ARQ worker: background processing
+        +-- Groq Whisper: hosted transcription
+        +-- Hash embeddings for MVP hosting
+        +-- Qdrant Cloud: vector retrieval
 ```
 
 | Layer | Technology |
@@ -53,26 +71,38 @@ FastAPI backend
 | Authentication | JWT access tokens and rotating HttpOnly refresh cookies |
 | Database | PostgreSQL |
 | Queue | Redis and ARQ |
-| Transcription | faster-whisper |
-| Embeddings | sentence-transformers |
+| Transcription | Groq Whisper in production, faster-whisper available locally |
+| Embeddings | Hash embeddings for the hosted MVP, sentence-transformers available locally |
 | Vector database | Qdrant |
+| Deployment | Vercel frontend, Render backend and worker |
 
-## Local Setup
+## Product Workflow
+
+1. Create an account.
+2. Create a knowledge space.
+3. Add a podcast, TED page, or direct audio source.
+4. Track ingestion progress while the worker downloads, transcribes, chunks,
+   embeds, and indexes the source.
+5. Browse the timestamped transcript.
+6. Ask questions and inspect cited evidence cards.
+7. Compare sources, save insights, and generate research briefs.
+
+## Local Development
 
 ### Prerequisites
 
 - Python 3.11+
 - Node.js 20+
 - Docker Desktop
-- FFmpeg for audio extraction
+- FFmpeg
 
-### Start infrastructure
+### Start Infrastructure
 
 ```powershell
 docker compose up -d
 ```
 
-### Start the backend
+### Backend
 
 ```powershell
 cd backend
@@ -92,7 +122,7 @@ cd backend
 python worker.py
 ```
 
-### Start the frontend
+### Frontend
 
 ```powershell
 cd frontend
@@ -100,88 +130,69 @@ npm install
 npm run dev
 ```
 
-Open `http://localhost:3000`. FastAPI documentation is available at
-`http://localhost:8000/api/docs`.
+Open:
 
-### API keys
+- Frontend: http://localhost:3000
+- API docs: http://localhost:8000/api/docs
 
-No external AI API key is required for local MVP verification. By default,
-`LLM_PROVIDER=extractive`, which keeps grounded answers and comparisons local
-and deterministic. To test hosted answer generation, set:
+## Environment Notes
+
+Local development can run without hosted LLM generation by keeping:
 
 ```env
-LLM_PROVIDER=groq
-GROQ_API_KEY=your_key_here
+LLM_PROVIDER=extractive
 ```
 
-Use strong `JWT_ACCESS_SECRET` and `JWT_REFRESH_SECRET` values before any
-deployment. `QDRANT_API_KEY` is only needed for hosted Qdrant.
-See [docs/DEPLOYMENT_ENV.md](docs/DEPLOYMENT_ENV.md) before switching to
-`ENVIRONMENT=production`.
-Production Dockerfiles and `docker-compose.prod.example.yml` are included as a
-starting point for container deployment.
+For the hosted MVP, configure the backend web service and worker with:
+
+```env
+TRANSCRIPTION_PROVIDER=groq
+GROQ_API_KEY=your_groq_key
+EMBEDDING_PROVIDER=hash
+REDIS_URL=rediss://...
+QDRANT_URL=https://your-qdrant-cluster.cloud.qdrant.io
+QDRANT_API_KEY=your_qdrant_key
+```
+
+For production setup details, see [docs/DEPLOYMENT_ENV.md](docs/DEPLOYMENT_ENV.md).
 
 ## Verification
 
-Run the fast quality gate before starting a new module:
+Run the full local quality gate:
 
 ```powershell
 .\check_quality.ps1
 ```
 
-Run the Docker-backed integration gate when PostgreSQL, Redis, and Qdrant are
-available:
+This runs backend tests, Python compilation, frontend tests, lint, and a
+production frontend build.
+
+Run infrastructure-backed integration checks when Docker services are available:
 
 ```powershell
 .\check_integration.ps1
 ```
 
-When the local backend and frontend are running, verify demo readiness with:
+Run a local runtime smoke check when the app is running:
 
 ```powershell
 .\check_runtime.ps1
 ```
 
-The current gates cover:
+## Repository Structure
 
-- Backend unit and service tests
-- Worker success, failure, heartbeat, stale-job, and cleanup behavior
-- Authenticated SSE event contracts
-- Frontend SSE parsing
-- Python compilation, frontend lint, and production build
-- Real PostgreSQL persistence and cascading deletion
-- Real Redis queue dispatch
-- Real Qdrant tenant isolation and vector cleanup
-- Live Alembic migrations through the current schema head
-- Runtime smoke checks for Docker services, backend health, and frontend availability
-- GitHub Actions quality and infrastructure integration workflows
+```text
+backend/        FastAPI API, worker, services, models, migrations, tests
+frontend/       Next.js app, components, client state, frontend tests
+docs/           Deployment notes, acceptance checklist, demo runbook
+docker-compose.yml
+check_quality.ps1
+check_integration.ps1
+check_runtime.ps1
+```
 
-See [docs/MVP_ACCEPTANCE_CHECKLIST.md](docs/MVP_ACCEPTANCE_CHECKLIST.md) for the
-manual acceptance pass used to validate the end-to-end MVP.
-See [docs/DEMO_RUNBOOK.md](docs/DEMO_RUNBOOK.md) for a repeatable local demo path.
+## Privacy Model
 
-## Current Status
-
-| Area | Status |
-|---|---|
-| Secure authentication and session refresh | Implemented |
-| Knowledge spaces | Implemented |
-| Source preview and asynchronous ingestion | Implemented |
-| Transcript storage and pagination | Implemented |
-| Vector indexing and tenant-filtered retrieval | Implemented |
-| SSE progress, stale detection, and retries | Implemented |
-| Source cleanup | Implemented |
-| Persisted evidence chat and answer streaming | Implemented |
-| Chat session resume | Implemented |
-| Clickable timestamp citations | Implemented |
-| Cross-source comparison | Implemented |
-| Saved insights | Implemented |
-| Markdown research briefs | Implemented |
-| True token-by-token provider streaming | Planned |
-| PDF/Notion exports | Planned |
-
-## Privacy
-
-SourceCast is designed for private research workflows. Full transcripts are not
-published by default, retrieved evidence is excerpted, and source deletion
-removes associated transcript records and vector points.
+SourceCast is designed for private research workflows. User data is scoped by
+account, retrieval filters enforce user ownership, and deleting a source removes
+its transcript records and vector points.
