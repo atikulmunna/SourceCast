@@ -1,6 +1,20 @@
 # SourceCast
 
-**Live demo:** https://source-cast.vercel.app/
+<p>
+  <a href="https://source-cast.vercel.app/"><strong>Launch Live Demo</strong></a>
+  ·
+  <a href="docs/DEMO_RUNBOOK.md"><strong>Demo Runbook</strong></a>
+  ·
+  <a href="docs/DEPLOYMENT_ENV.md"><strong>Deployment Guide</strong></a>
+</p>
+
+<p>
+  <a href="https://source-cast.vercel.app/">
+    <img alt="Live demo" src="https://img.shields.io/badge/Live%20Demo-SourceCast-007AFF?style=for-the-badge">
+  </a>
+  <img alt="MVP status" src="https://img.shields.io/badge/MVP-Smoke%20Tested-34C759?style=for-the-badge">
+  <img alt="Evidence first" src="https://img.shields.io/badge/Answers-Cited%20Evidence-111111?style=for-the-badge">
+</p>
 
 SourceCast is an evidence-first research workspace for long-form audio and
 video. It turns podcasts, talks, interviews, lectures, and direct audio sources
@@ -9,6 +23,8 @@ into timestamped transcripts, searchable evidence, and source-grounded answers.
 Instead of producing loose summaries, SourceCast keeps every answer attached to
 retrieved transcript passages so researchers can inspect the supporting context
 and jump back to the original timestamp.
+
+![SourceCast ingestion and evidence workflow](docs/assets/sourcecast-demo.gif)
 
 ## What It Does
 
