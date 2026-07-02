@@ -3,7 +3,16 @@
 import { FormEvent, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { ArrowLeft, Clock, ExternalLink, Loader2, Search, Trash2 } from "lucide-react";
+import {
+  ArrowLeft,
+  CheckCircle2,
+  Clock,
+  ExternalLink,
+  Loader2,
+  Search,
+  ShieldCheck,
+  Trash2,
+} from "lucide-react";
 import Link from "next/link";
 import api from "@/lib/api";
 import {
@@ -146,13 +155,22 @@ export default function SourceDetailPage() {
         </div>
       </header>
 
-      <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_360px] gap-6 items-start">
+      <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_400px] gap-6 items-start">
         <section className="rounded-xl overflow-hidden" style={panelStyle}>
-          <div className="p-4 border-b" style={{ borderColor: "var(--border)" }}>
-            <h2 className="font-semibold">Transcript</h2>
-            <p className="text-xs" style={{ color: "var(--text-muted)" }}>
-              Timestamped transcript segments from the ingestion pipeline.
-            </p>
+          <div className="p-5 border-b" style={{ borderColor: "var(--border)" }}>
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <h2 className="font-semibold">Transcript</h2>
+                <p className="text-xs mt-1" style={{ color: "var(--text-muted)" }}>
+                  Timestamped passages from this source.
+                </p>
+              </div>
+              {transcript?.total ? (
+                <span className="text-xs whitespace-nowrap" style={{ color: "var(--text-muted)" }}>
+                  {transcript.total} segments
+                </span>
+              ) : null}
+            </div>
           </div>
 
           {source.transcript_status !== "TRANSCRIBED" ? (
@@ -166,7 +184,7 @@ export default function SourceDetailPage() {
             </div>
           ) : (
             <>
-              <div className="divide-y" style={{ borderColor: "var(--border)" }}>
+              <div className="divide-y" style={{ borderColor: "var(--border-subtle)" }}>
                 {(transcript?.segments || []).map((segment) => (
                   <TranscriptRow key={segment.id} segment={segment} />
                 ))}
@@ -196,16 +214,30 @@ export default function SourceDetailPage() {
           )}
         </section>
 
-        <aside className="rounded-xl p-4 sticky top-6" style={panelStyle}>
-          <div className="flex items-center gap-2 mb-3">
-            <Search size={17} style={{ color: "var(--accent)" }} />
-            <h2 className="font-semibold">Ask This Source</h2>
+        <aside className="rounded-xl p-5 sticky top-6" style={panelStyle}>
+          <div className="flex items-start justify-between gap-3 mb-4">
+            <div className="flex items-center gap-2">
+              <Search size={17} style={{ color: "var(--accent)" }} />
+              <h2 className="font-semibold">Ask This Source</h2>
+            </div>
+            {ready && (
+              <span
+                className="inline-flex items-center gap-1 rounded-full px-2 py-1 text-xs"
+                style={{
+                  background: "rgba(52,199,89,0.12)",
+                  color: "var(--accent-strong)",
+                }}
+              >
+                <CheckCircle2 size={12} />
+                Indexed
+              </span>
+            )}
           </div>
           <form onSubmit={ask} className="space-y-3">
             <textarea
               value={question}
               onChange={(event) => setQuestion(event.target.value)}
-              rows={4}
+              rows={5}
               disabled={!ready || asking}
               placeholder={ready ? "What does this source say about..." : "Source must finish indexing first"}
               className="w-full rounded-lg p-3 text-sm outline-none resize-none disabled:opacity-50"
@@ -231,11 +263,42 @@ export default function SourceDetailPage() {
           )}
 
           {answer && (
-            <div className="mt-5 space-y-4">
-              <p className="text-sm leading-relaxed">{answer.answer}</p>
-              <div className="space-y-3">
+            <div className="mt-5 space-y-5">
+              <div
+                className="rounded-lg p-4"
+                style={{
+                  background: "var(--bg-elevated)",
+                  border: "1px solid var(--border-subtle)",
+                }}
+              >
+                <div className="flex items-center gap-2 mb-3">
+                  <ShieldCheck size={15} style={{ color: "var(--accent)" }} />
+                  <span className="text-xs font-semibold uppercase tracking-wide" style={{ color: "var(--text-muted)" }}>
+                    Evidence answer
+                  </span>
+                </div>
+                <p className="text-sm leading-7">{answer.answer}</p>
+              </div>
+
+              <div>
+                <div className="flex items-center justify-between gap-3 mb-3">
+                  <h3 className="text-xs font-semibold uppercase tracking-wide" style={{ color: "var(--text-muted)" }}>
+                    Evidence used
+                  </h3>
+                  <span className="text-xs" style={{ color: "var(--text-muted)" }}>
+                    {answer.evidence.length} passages
+                  </span>
+                </div>
+                <div className="space-y-3">
                 {answer.evidence.map((item) => (
-                  <div key={item.chunk_id} className="rounded-lg p-3" style={{ background: "var(--bg-secondary)", border: "1px solid var(--border)" }}>
+                  <div
+                    key={item.chunk_id}
+                    className="rounded-lg p-3.5"
+                    style={{
+                      background: "var(--bg-secondary)",
+                      border: "1px solid var(--border-subtle)",
+                    }}
+                  >
                     <div className="flex items-center justify-between gap-2 mb-2">
                       <div className="flex items-center gap-2">
                         <span className="text-xs font-medium" style={{ color: "var(--accent-strong)" }}>
@@ -254,15 +317,22 @@ export default function SourceDetailPage() {
                           </a>
                         )}
                       </div>
-                      <span className="text-xs" style={{ color: "var(--text-muted)" }}>
+                      <span
+                        className="rounded-full px-2 py-0.5 text-xs"
+                        style={{
+                          background: "rgba(60,60,67,0.08)",
+                          color: "var(--text-muted)",
+                        }}
+                      >
                         {item.confidence_label}
                       </span>
                     </div>
-                    <p className="text-xs leading-relaxed" style={{ color: "var(--text-secondary)" }}>
+                    <p className="line-clamp-5 text-xs leading-6" style={{ color: "var(--text-secondary)" }}>
                       {item.excerpt}
                     </p>
                   </div>
                 ))}
+                </div>
               </div>
             </div>
           )}
@@ -274,11 +344,11 @@ export default function SourceDetailPage() {
 
 function TranscriptRow({ segment }: { segment: TranscriptSegment }) {
   return (
-    <div className="grid grid-cols-[84px_minmax(0,1fr)] gap-4 p-4">
-      <span className="text-xs font-medium" style={{ color: "var(--accent-strong)" }}>
+    <div className="grid grid-cols-[72px_minmax(0,1fr)] gap-5 px-5 py-4 hover:bg-black/[0.015]">
+      <span className="pt-0.5 text-xs font-semibold tabular-nums" style={{ color: "var(--accent-strong)" }}>
         {formatTimestamp(Number(segment.start_time_sec))}
       </span>
-      <p className="text-sm leading-relaxed" style={{ color: "var(--text-secondary)" }}>
+      <p className="text-sm leading-7" style={{ color: "var(--text-secondary)" }}>
         {segment.text}
       </p>
     </div>
