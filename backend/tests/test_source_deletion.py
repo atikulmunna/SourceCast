@@ -57,7 +57,7 @@ async def test_delete_source_cleans_audio_vectors_and_database(
 
     await delete_source(source.id, SimpleNamespace(id=user_id), db)
 
-    assert str(deleted_audio[0]).endswith("tmp\\audio.mp3")
+    assert deleted_audio[0].parts[-2:] == ("tmp", "audio.mp3")
     assert deleted_vectors[0][1] == source.id
     assert db.deleted == [source]
     assert db.commits == 1
@@ -80,4 +80,3 @@ async def test_delete_source_still_removes_database_row_when_vector_cleanup_fail
 
     assert db.deleted == [source]
     assert db.commits == 1
-
