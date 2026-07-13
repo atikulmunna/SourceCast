@@ -1,0 +1,38 @@
+name: Qdrant Keepalive
+
+on:
+  schedule:
+    # Twice a month is safely inside Qdrant's inactivity window.
+    - cron: "17 3 1,16 * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  ping:
+    name: Ping Qdrant cluster
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+
+    steps:
+      - name: Validate secrets
+        env:
+          QDRANT_URL: ${{ secrets.QDRANT_URL }}
+          QDRANT_API_KEY: ${{ secrets.QDRANT_API_KEY }}
+        run: |
+          test -n "$QDRANT_URL" || { echo "QDRANT_URL secret is missing"; exit 1; }
+          test -n "$QDRANT_API_KEY" || { echo "QDRANT_API_KEY secret is missing"; exit 1; }
+
+      - name: Ping collections endpoint
+        env:
+          QDRANT_URL: ${{ secrets.QDRANT_URL }}
+          QDRANT_API_KEY: ${{ secrets.QDRANT_API_KEY }}
+        run: |
+          base_url="${QDRANT_URL%/}"
+          curl --fail --show-error --silent \
+            --header "api-key: ${QDRANT_API_KEY}" \
+            "${base_url}/collections" \
+            > /dev/null
+
+          echo "Qdrant keepalive request succeeded."
