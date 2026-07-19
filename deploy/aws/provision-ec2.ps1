@@ -61,11 +61,15 @@ $existingKey = if ($existingKeyOutput) { $existingKeyOutput.Trim() } else { "" }
 
 if ($LASTEXITCODE -ne 0 -or $existingKey -eq "None" -or -not $existingKey) {
   Write-Host "Creating key pair: $KeyName"
-  & aws ec2 create-key-pair `
+  $keyPair = & aws ec2 create-key-pair `
     --region $Region `
     --key-name $KeyName `
-    --query "KeyMaterial" `
-    --output text | Set-Content -NoNewline -Path $keyPath -Encoding ascii
+    --output json | ConvertFrom-Json
+  [System.IO.File]::WriteAllText(
+    $keyPath,
+    $keyPair.KeyMaterial,
+    [System.Text.Encoding]::ASCII
+  )
   Write-Host "Saved private key to $keyPath"
 } else {
   Write-Host "Using existing key pair: $KeyName"
