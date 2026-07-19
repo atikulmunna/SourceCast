@@ -59,7 +59,13 @@ def _load_model(model_name: str):
     Load and cache a SentenceTransformer model.
     First call downloads the model from HuggingFace Hub (~90 MB for MiniLM).
     """
-    from sentence_transformers import SentenceTransformer
+    try:
+        from sentence_transformers import SentenceTransformer
+    except ImportError as exc:
+        raise RuntimeError(
+            "Sentence-transformer embeddings require the optional local ML dependencies. "
+            'Install them with `pip install -e ".[local-ml]"` or set EMBEDDING_PROVIDER=hash.'
+        ) from exc
 
     logger.info(
         "Loading sentence-transformers model '%s' (first run may download)…",

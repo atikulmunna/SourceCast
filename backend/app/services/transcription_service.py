@@ -40,7 +40,14 @@ def _load_model(model_size: str):
     Load and cache a faster-whisper model.
     Models are downloaded from HuggingFace on first use and cached locally.
     """
-    from faster_whisper import WhisperModel
+    try:
+        from faster_whisper import WhisperModel
+    except ImportError as exc:
+        raise RuntimeError(
+            "Local transcription requires the optional local ML dependencies. "
+            'Install them with `pip install -e ".[local-ml]"` or set '
+            "TRANSCRIPTION_PROVIDER=groq."
+        ) from exc
 
     logger.info("Loading Whisper model: %s (this may download on first run)", model_size)
     model = WhisperModel(model_size, device="cpu", compute_type="int8")

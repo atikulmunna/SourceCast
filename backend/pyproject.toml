@@ -20,15 +20,18 @@ dependencies = [
     "yt-dlp>=2024.5.1",
     "youtube-transcript-api>=1.2.0",
     "arq>=0.25.0",
-    "faster-whisper>=1.0.0",
     "aiofiles>=23.0.0",
-    "qdrant-client[fastembed]>=1.9.0",
-    "sentence-transformers>=2.7.0",
+    "qdrant-client>=1.9.0",
     "python-dotenv>=1.0.0",
     "email-validator>=2.1.0",
 ]
 
 [project.optional-dependencies]
+local-ml = [
+    "faster-whisper>=1.0.0",
+    "qdrant-client[fastembed]>=1.9.0",
+    "sentence-transformers>=2.7.0",
+]
 dev = [
     "pytest>=8.2.0",
     "pytest-asyncio>=0.23.0",
