@@ -52,11 +52,12 @@ if (-not $amiId) {
 }
 
 $keyPath = Join-Path $PSScriptRoot "$KeyName.pem"
-$existingKey = (& aws ec2 describe-key-pairs `
+$existingKeyOutput = & aws ec2 describe-key-pairs `
   --region $Region `
   --key-names $KeyName `
   --query "KeyPairs[0].KeyName" `
-  --output text 2>$null).Trim()
+  --output text 2>$null
+$existingKey = if ($existingKeyOutput) { $existingKeyOutput.Trim() } else { "" }
 
 if ($LASTEXITCODE -ne 0 -or $existingKey -eq "None" -or -not $existingKey) {
   Write-Host "Creating key pair: $KeyName"
@@ -73,11 +74,12 @@ if ($LASTEXITCODE -ne 0 -or $existingKey -eq "None" -or -not $existingKey) {
   }
 }
 
-$sgId = (& aws ec2 describe-security-groups `
+$sgIdOutput = & aws ec2 describe-security-groups `
   --region $Region `
   --filters "Name=group-name,Values=$SecurityGroupName" "Name=vpc-id,Values=$vpcId" `
   --query "SecurityGroups[0].GroupId" `
-  --output text).Trim()
+  --output text
+$sgId = if ($sgIdOutput) { $sgIdOutput.Trim() } else { "" }
 
 if (-not $sgId -or $sgId -eq "None") {
   Write-Host "Creating security group: $SecurityGroupName"
