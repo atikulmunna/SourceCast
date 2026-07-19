@@ -1,17 +1,15 @@
 # SourceCast
 
 <p>
-  <a href="https://source-cast.vercel.app/"><strong>Launch Live Demo</strong></a>
-  ·
   <a href="docs/DEMO_RUNBOOK.md"><strong>Demo Runbook</strong></a>
   ·
   <a href="docs/DEPLOYMENT_ENV.md"><strong>Deployment Guide</strong></a>
+  ·
+  <a href="deploy/aws/README.md"><strong>AWS Runbook</strong></a>
 </p>
 
 <p>
-  <a href="https://source-cast.vercel.app/">
-    <img alt="Live demo" src="https://img.shields.io/badge/Live%20Demo-SourceCast-007AFF?style=for-the-badge">
-  </a>
+  <img alt="AWS ready" src="https://img.shields.io/badge/Deploy-AWS%20EC2-FF9900?style=for-the-badge">
   <img alt="MVP status" src="https://img.shields.io/badge/MVP-Smoke%20Tested-34C759?style=for-the-badge">
   <img alt="Evidence first" src="https://img.shields.io/badge/Answers-Cited%20Evidence-111111?style=for-the-badge">
 </p>
@@ -56,7 +54,6 @@ Verified on the deployed backend with:
 
 ## Current Limitations
 
-- Render cold starts can make the first backend request slow.
 - YouTube ingestion from hosted servers is unreliable without residential
   proxies or a configured yt-dlp cookies file because YouTube often blocks
   cloud IP addresses.
@@ -66,11 +63,12 @@ Verified on the deployed backend with:
 ## Architecture
 
 ```text
-Next.js frontend on Vercel
+AWS EC2
+  |
+  +-- Caddy reverse proxy
         |
-        | HTTPS + authenticated requests
-        v
-FastAPI backend on Render
+        +-- Next.js frontend
+        +-- FastAPI backend
         |
         +-- PostgreSQL / Supabase: app data
         +-- Redis / Upstash: ingestion queue
@@ -90,7 +88,7 @@ FastAPI backend on Render
 | Transcription | Groq Whisper in production, faster-whisper available locally |
 | Embeddings | Hash embeddings for the hosted MVP, sentence-transformers available locally |
 | Vector database | Qdrant |
-| Deployment | Vercel frontend, Render backend and worker |
+| Deployment | AWS EC2 with Docker Compose and Caddy |
 
 ## Product Workflow
 
@@ -128,6 +126,13 @@ pip install -e ".[dev]"
 Copy-Item .env.example .env -Force
 alembic upgrade head
 uvicorn app.main:app --reload --port 8000
+```
+
+Local Whisper and sentence-transformer embeddings are optional. Install them only
+when you want to run local ML instead of Groq transcription and hash embeddings:
+
+```powershell
+pip install -e ".[dev,local-ml]"
 ```
 
 Start the worker in another terminal:
@@ -171,6 +176,7 @@ QDRANT_API_KEY=your_qdrant_key
 ```
 
 For production setup details, see [docs/DEPLOYMENT_ENV.md](docs/DEPLOYMENT_ENV.md).
+For the AWS EC2 deployment path, see [deploy/aws/README.md](deploy/aws/README.md).
 
 ## Verification
 
@@ -201,6 +207,7 @@ Run a local runtime smoke check when the app is running:
 backend/        FastAPI API, worker, services, models, migrations, tests
 frontend/       Next.js app, components, client state, frontend tests
 docs/           Deployment notes, acceptance checklist, demo runbook
+deploy/aws/     AWS EC2 Docker Compose deployment bundle
 docker-compose.yml
 check_quality.ps1
 check_integration.ps1

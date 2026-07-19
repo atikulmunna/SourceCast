@@ -35,6 +35,8 @@ backend/tmp/
 nul
 backend/nul
 *.log
+deploy/aws/*.pem
+deploy/aws/*.pub
 
 # Editor and OS metadata
 .DS_Store

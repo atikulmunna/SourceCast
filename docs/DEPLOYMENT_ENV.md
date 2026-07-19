@@ -29,7 +29,7 @@ Use this checklist before setting `ENVIRONMENT=production`.
 | `GROQ_TRANSCRIPTION_MODEL` | Use `whisper-large-v3-turbo` for fast hosted transcription, or `whisper-large-v3` for higher accuracy. |
 | `TRANSCRIPTION_TIMEOUT_SECONDS` | HTTP timeout for hosted transcription requests. |
 | `EMBEDDING_PROVIDER` | Use `hash` on small hosted workers, or `sentence-transformers` when the worker can load MiniLM. |
-| `WHISPER_MODEL` | Use `tiny` for small Render workers; larger models need more memory, CPU, or GPU capacity. |
+| `WHISPER_MODEL` | Use `tiny` for small CPU workers; larger models need more memory, CPU, or GPU capacity. |
 | `YOUTUBE_TRANSCRIPT_LANGUAGES` | Comma-separated YouTube caption language preference order. Defaults to `en,en-US,en-GB`. |
 | `YTDLP_COOKIES_FILE` | Optional path to a Netscape-format YouTube cookies file mounted into the backend container. |
 | `YTDLP_PROXY_URL` | Optional proxy URL for yt-dlp metadata/audio requests. |
@@ -79,22 +79,24 @@ WORKER_POLL_DELAY_SECONDS=10
 
 ## Whisper Model Size
 
-For low-memory hosted workers, keep:
+Local Whisper support is optional. Install `.[local-ml]` before using
+`TRANSCRIPTION_PROVIDER=local`.
+
+For low-memory CPU workers, keep:
 
 ```env
 WHISPER_MODEL=tiny
 ```
 
-If Render logs show the worker downloading `faster-whisper-base` and then the
-instance restarts without a Python traceback, the process was likely killed by
-the platform while loading the model. Upgrade the worker before using `base` or
-larger models.
+If the worker downloads `faster-whisper-base` and then restarts without a Python
+traceback, the process was likely killed while loading the model. Use hosted
+Groq transcription or upgrade the instance before using `base` or larger models.
 
 ## Hosted Transcription
 
-Small Render workers may also restart while loading `faster-whisper-tiny`. In
-that case, offload transcription to Groq on both the web service and the
-background worker:
+Small CPU workers may also restart while loading `faster-whisper-tiny`. In that
+case, offload transcription to Groq on both the web service and the background
+worker:
 
 ```env
 TRANSCRIPTION_PROVIDER=groq
@@ -127,10 +129,10 @@ YTDLP_COOKIES_FILE=/app/secrets/youtube-cookies.txt
 Do not commit the cookies file. Treat it like a password and rotate it if it is
 shared accidentally.
 
-Render and other cloud providers may also be blocked from public YouTube
-transcript endpoints. The most reliable production option is a rotating
-residential proxy for transcript lookup. With Webshare Residential proxies, set
-these on both the web service and worker:
+Cloud provider IPs may also be blocked from public YouTube transcript endpoints.
+The most reliable production option is a rotating residential proxy for
+transcript lookup. With Webshare Residential proxies, set these on both the web
+service and worker:
 
 ```env
 WEBSHARE_PROXY_USERNAME=your-webshare-proxy-username
@@ -152,7 +154,7 @@ same proxy.
 
 ## Hosted Worker Embeddings
 
-Small Render workers can also restart while loading the local
+Small CPU workers can also restart while loading the local
 `sentence-transformers/all-MiniLM-L6-v2` embedding model. For the MVP demo path,
 use deterministic hash embeddings instead:
 
@@ -164,7 +166,8 @@ DEFAULT_QDRANT_COLLECTION=source_chunks_v1_minilm_384
 
 Hash embeddings keep Qdrant indexing and retrieval working without loading a
 local ML model. Use `EMBEDDING_PROVIDER=sentence-transformers` again when the
-backend runs on a worker with enough memory for MiniLM.
+backend runs on a worker with enough memory for MiniLM and the `.[local-ml]`
+extra is installed.
 
 ## Required Frontend Values
 
@@ -193,23 +196,26 @@ Run the runtime smoke check after deploying or restarting services:
 .\check_runtime.ps1 -BackendUrl "https://api.example.com" -FrontendUrl "https://app.example.com"
 ```
 
-## Container Packaging
+## AWS Container Packaging
 
 The repository includes production Dockerfiles for the backend and frontend plus
-`docker-compose.prod.example.yml`. Copy the example compose file before editing
-real secrets, then replace every `replace-with-*` value.
+an AWS EC2 Docker Compose bundle in `deploy/aws`.
 
-The production compose example stays on `LLM_PROVIDER=extractive`, so no hosted
-LLM API key is required until you choose to enable `groq`.
-
-For Render Docker deployments, set the backend web service Docker command to:
+For the simplest production path, copy `deploy/aws/.env.example` to
+`deploy/aws/.env`, fill in real secrets, then run:
 
 ```sh
-./start-web.sh
+cd deploy/aws
+docker compose up -d --build
+docker compose exec backend python -m alembic upgrade head
 ```
 
-Set the Render background worker Docker command to:
+The AWS compose setup runs four containers on one EC2 instance:
 
-```sh
-./start-worker.sh
-```
+- `caddy`: public reverse proxy on ports `80` and `443`
+- `frontend`: Next.js standalone server
+- `backend`: FastAPI API
+- `worker`: ARQ ingestion worker
+
+Keep `NEXT_PUBLIC_API_URL` empty in `deploy/aws/.env` so the browser calls the
+API on the same origin through Caddy.
