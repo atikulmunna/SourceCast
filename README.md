@@ -1,64 +1,86 @@
 # SourceCast
 
-<p>
-  <a href="docs/DEMO_RUNBOOK.md"><strong>Demo Runbook</strong></a>
-  ·
-  <a href="docs/DEPLOYMENT_ENV.md"><strong>Deployment Guide</strong></a>
-  ·
-  <a href="deploy/aws/README.md"><strong>AWS Runbook</strong></a>
+<p align="center">
+  <a href="https://54-164-220-16.sslip.io">
+    <img alt="Open SourceCast" src="https://img.shields.io/badge/Open%20Live%20Demo-SourceCast-007AFF?style=for-the-badge">
+  </a>
+  <a href="docs/DEMO_RUNBOOK.md">
+    <img alt="Demo runbook" src="https://img.shields.io/badge/Demo-Runbook-111111?style=for-the-badge">
+  </a>
+  <a href="deploy/aws/README.md">
+    <img alt="AWS deployment" src="https://img.shields.io/badge/Deploy-AWS%20EC2-FF9900?style=for-the-badge">
+  </a>
 </p>
 
-<p>
-  <img alt="AWS ready" src="https://img.shields.io/badge/Deploy-AWS%20EC2-FF9900?style=for-the-badge">
-  <img alt="MVP status" src="https://img.shields.io/badge/MVP-Smoke%20Tested-34C759?style=for-the-badge">
-  <img alt="Evidence first" src="https://img.shields.io/badge/Answers-Cited%20Evidence-111111?style=for-the-badge">
+<p align="center">
+  <strong>Evidence-grounded research for long-form audio and video.</strong>
 </p>
 
-SourceCast is an evidence-first research workspace for long-form audio and
-video. It turns podcasts, talks, interviews, lectures, and direct audio sources
-into timestamped transcripts, searchable evidence, and source-grounded answers.
-
-Instead of producing loose summaries, SourceCast keeps every answer attached to
-retrieved transcript passages so researchers can inspect the supporting context
-and jump back to the original timestamp.
+SourceCast turns podcasts, talks, interviews, lectures, and direct audio sources
+into timestamped transcripts, searchable evidence, and citation-backed answers.
+It is built for research workflows where the answer is only useful if the user
+can inspect the supporting passage and return to the source.
 
 ![SourceCast ingestion and evidence workflow](docs/assets/sourcecast-demo.gif)
 
-## What It Does
+## Highlights
 
-- Ingests supported media URLs through a background worker.
-- Transcribes audio with timestamped segments.
-- Chunks transcripts and indexes them in Qdrant.
-- Lets users ask source-scoped or workspace-scoped questions.
-- Returns answers with evidence cards, confidence labels, and timestamp links.
-- Supports private accounts, knowledge spaces, saved chats, comparisons,
-  saved insights, and Markdown research briefs.
+- Ingest media URLs through an asynchronous worker pipeline.
+- Generate timestamped transcripts and source-level transcript views.
+- Chunk, embed, and index source text in Qdrant for retrieval.
+- Ask source-scoped or workspace-scoped questions.
+- Return answers with cited evidence cards, confidence labels, and timestamp
+  links.
+- Manage private accounts, knowledge spaces, saved chats, comparisons, saved
+  insights, and Markdown research briefs.
+- Run production as a single AWS EC2 Docker Compose deployment with Caddy,
+  FastAPI, Next.js, and a background worker.
 
-## MVP Status
+## Live Demo
 
-The core research loop is live:
+Launch the deployed app:
+
+<p>
+  <a href="https://54-164-220-16.sslip.io">
+    <img alt="Launch SourceCast" src="https://img.shields.io/badge/Launch%20SourceCast-https%3A%2F%2F54--164--220--16.sslip.io-007AFF?style=for-the-badge">
+  </a>
+</p>
+
+Recommended demo sources:
+
+- TED talks
+- Podcast pages or RSS audio links
+- Direct `.mp3` URLs
+
+YouTube support is implemented with captions-first ingestion and optional
+cookies/proxy settings, but hosted YouTube extraction can still be unreliable
+because YouTube frequently blocks cloud IP addresses.
+
+## Core Workflow
 
 ```text
-source URL -> transcript -> chunks -> embeddings -> retrieval -> cited answer
+source URL
+  -> metadata preview
+  -> background ingestion job
+  -> transcript segments
+  -> chunks
+  -> embeddings
+  -> Qdrant index
+  -> retrieval
+  -> cited answer
 ```
 
-Verified on the deployed backend with:
+The deployed MVP has been smoke-tested for:
 
+- Signup and login
+- Knowledge space creation
 - Source preview
 - Background ingestion
 - Hosted transcription
 - Transcript browsing
 - Vector indexing
 - Ask-with-evidence
-- Evidence cleanup after test workspace deletion
-
-## Current Limitations
-
-- YouTube ingestion from hosted servers is unreliable without residential
-  proxies or a configured yt-dlp cookies file because YouTube often blocks
-  cloud IP addresses.
-- Podcast RSS feeds, TED pages, and direct audio URLs are the recommended demo
-  sources today.
+- Workspace cleanup
 
 ## Architecture
 
@@ -69,12 +91,11 @@ AWS EC2
         |
         +-- Next.js frontend
         +-- FastAPI backend
+        +-- ARQ worker
         |
-        +-- PostgreSQL / Supabase: app data
-        +-- Redis / Upstash: ingestion queue
-        +-- ARQ worker: background processing
+        +-- Supabase Postgres: app data
+        +-- Upstash Redis: ingestion queue
         +-- Groq Whisper: hosted transcription
-        +-- Hash embeddings for MVP hosting
         +-- Qdrant Cloud: vector retrieval
 ```
 
@@ -82,24 +103,32 @@ AWS EC2
 |---|---|
 | Frontend | Next.js, TypeScript, Tailwind CSS, TanStack Query, Zustand |
 | Backend | FastAPI, Python, SQLAlchemy async, Alembic |
-| Authentication | JWT access tokens and rotating HttpOnly refresh cookies |
+| Auth | JWT access tokens and rotating HttpOnly refresh cookies |
+| Worker | ARQ background jobs |
 | Database | PostgreSQL |
-| Queue | Redis and ARQ |
-| Transcription | Groq Whisper in production, faster-whisper available locally |
-| Embeddings | Hash embeddings for the hosted MVP, sentence-transformers available locally |
-| Vector database | Qdrant |
-| Deployment | AWS EC2 with Docker Compose and Caddy |
+| Queue | Redis |
+| Transcription | Groq Whisper in production, optional faster-whisper locally |
+| Embeddings | Hash embeddings for the hosted MVP, optional sentence-transformers locally |
+| Retrieval | Qdrant |
+| Deployment | AWS EC2, Docker Compose, Caddy, Let's Encrypt |
 
-## Product Workflow
+## Deployment
 
-1. Create an account.
-2. Create a knowledge space.
-3. Add a podcast, TED page, or direct audio source.
-4. Track ingestion progress while the worker downloads, transcribes, chunks,
-   embeds, and indexes the source.
-5. Browse the timestamped transcript.
-6. Ask questions and inspect cited evidence cards.
-7. Compare sources, save insights, and generate research briefs.
+Production runs from `deploy/aws` on one small EC2 instance:
+
+- `backend`: FastAPI API
+- `worker`: ingestion worker
+- `frontend`: Next.js standalone server
+- `caddy`: HTTPS reverse proxy
+
+The frontend and backend share one origin. Browser requests use `/api/v1/...`,
+and Caddy routes `/api/*` to the backend.
+
+Start here:
+
+- [AWS EC2 Runbook](deploy/aws/README.md)
+- [Environment Guide](docs/DEPLOYMENT_ENV.md)
+- [Demo Runbook](docs/DEMO_RUNBOOK.md)
 
 ## Local Development
 
@@ -128,8 +157,7 @@ alembic upgrade head
 uvicorn app.main:app --reload --port 8000
 ```
 
-Local Whisper and sentence-transformer embeddings are optional. Install them only
-when you want to run local ML instead of Groq transcription and hash embeddings:
+Local Whisper and sentence-transformer embeddings are optional:
 
 ```powershell
 pip install -e ".[dev,local-ml]"
@@ -156,17 +184,13 @@ Open:
 - Frontend: http://localhost:3000
 - API docs: http://localhost:8000/api/docs
 
-## Environment Notes
+## Environment
 
-Local development can run without hosted LLM generation by keeping:
-
-```env
-LLM_PROVIDER=extractive
-```
-
-For the hosted MVP, configure the backend web service and worker with:
+For the hosted MVP, configure the backend and worker with:
 
 ```env
+ENVIRONMENT=production
+DEBUG=false
 TRANSCRIPTION_PROVIDER=groq
 GROQ_API_KEY=your_groq_key
 EMBEDDING_PROVIDER=hash
@@ -175,8 +199,14 @@ QDRANT_URL=https://your-qdrant-cluster.cloud.qdrant.io
 QDRANT_API_KEY=your_qdrant_key
 ```
 
-For production setup details, see [docs/DEPLOYMENT_ENV.md](docs/DEPLOYMENT_ENV.md).
-For the AWS EC2 deployment path, see [deploy/aws/README.md](deploy/aws/README.md).
+For AWS same-origin hosting, keep:
+
+```env
+NEXT_PUBLIC_API_URL=
+```
+
+This makes the frontend call `/api/v1/...` on the same HTTPS origin instead of
+calling a separate backend URL.
 
 ## Verification
 
@@ -185,9 +215,6 @@ Run the full local quality gate:
 ```powershell
 .\check_quality.ps1
 ```
-
-This runs backend tests, Python compilation, frontend tests, lint, and a
-production frontend build.
 
 Run infrastructure-backed integration checks when Docker services are available:
 
