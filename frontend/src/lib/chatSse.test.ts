@@ -35,7 +35,7 @@ describe("streamChatTurn", () => {
     await streamChatTurn("session-1", "What happened?", (event) => events.push(event));
 
     expect(fetchMock).toHaveBeenCalledWith(
-      "http://localhost:8000/api/v1/chat/sessions/session-1/ask",
+      "/api/v1/chat/sessions/session-1/ask",
       expect.objectContaining({
         method: "POST",
         body: JSON.stringify({ question: "What happened?" }),

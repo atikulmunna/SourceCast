@@ -1,3 +1,5 @@
+import { apiPath } from "./apiBase";
+
 export interface SseMessage<T = unknown> {
   event: string;
   data: T;
@@ -52,12 +54,11 @@ export async function streamJobEvents(
   onEvent: (event: JobStreamEvent) => void,
   signal: AbortSignal
 ) {
-  const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
   const token =
     typeof window !== "undefined"
       ? window.__sourcecast_access_token
       : undefined;
-  const response = await fetch(`${apiUrl}/api/v1/jobs/${jobId}/stream`, {
+  const response = await fetch(apiPath(`/api/v1/jobs/${jobId}/stream`), {
     credentials: "include",
     headers: token ? { Authorization: `Bearer ${token}` } : undefined,
     signal,

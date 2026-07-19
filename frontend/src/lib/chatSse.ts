@@ -1,4 +1,5 @@
 import { parseSseBuffer } from "./jobSse";
+import { apiPath } from "./apiBase";
 import { ChatMessage } from "./types";
 
 export interface ChatStartedEvent {
@@ -31,12 +32,11 @@ export async function streamChatTurn(
   onEvent: (event: ChatStreamEvent) => void,
   signal?: AbortSignal
 ) {
-  const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
   const token =
     typeof window !== "undefined"
       ? window.__sourcecast_access_token
       : undefined;
-  const response = await fetch(`${apiUrl}/api/v1/chat/sessions/${sessionId}/ask`, {
+  const response = await fetch(apiPath(`/api/v1/chat/sessions/${sessionId}/ask`), {
     method: "POST",
     credentials: "include",
     headers: {

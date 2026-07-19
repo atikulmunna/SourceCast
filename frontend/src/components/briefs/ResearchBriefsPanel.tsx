@@ -4,6 +4,7 @@ import { FormEvent, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Download, FileText, Loader2, Trash2 } from "lucide-react";
 import api from "@/lib/api";
+import { apiPath } from "@/lib/apiBase";
 import { ResearchBrief, Source, getErrorMessage } from "@/lib/types";
 
 export function ResearchBriefsPanel({ spaceId, sources }: { spaceId: string; sources: Source[] }) {
@@ -64,8 +65,7 @@ export function ResearchBriefsPanel({ spaceId, sources }: { spaceId: string; sou
   };
 
   const exportMarkdown = (briefId: string) => {
-    const apiUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
-    window.open(`${apiUrl}/api/v1/briefs/${briefId}/export/markdown`, "_blank", "noreferrer");
+    window.open(apiPath(`/api/v1/briefs/${briefId}/export/markdown`), "_blank", "noreferrer");
   };
 
   return (

@@ -1,12 +1,12 @@
 import axios, { AxiosError, AxiosRequestConfig, AxiosResponse } from "axios";
+import { apiPath } from "./apiBase";
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 type SessionExpiredHandler = () => void;
 
 let sessionExpiredHandler: SessionExpiredHandler | null = null;
 
 export const api = axios.create({
-  baseURL: `${API_URL}/api/v1`,
+  baseURL: apiPath("/api/v1"),
   withCredentials: true, // Required for HttpOnly refresh cookie
   timeout: 30_000,
   headers: {
