@@ -139,10 +139,10 @@ docker compose logs -f caddy
 - Set an AWS Budget alert below your project cap, for example `$25` and `$40`.
 - Stop or terminate the EC2 instance when you no longer need the always-on demo.
 
-Create a `$40/month` AWS Budget alert from PowerShell:
+Create a `$40/year` AWS Budget alert from PowerShell:
 
 ```powershell
-.\deploy\aws\create-budget.ps1 -MonthlyLimitUsd 40 -AlertEmail you@example.com
+.\deploy\aws\create-budget.ps1 -LimitUsd 40 -TimeUnit ANNUALLY -AlertEmail you@example.com
 ```
 
 AWS sends a confirmation email before budget notifications activate.

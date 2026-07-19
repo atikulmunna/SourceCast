@@ -1,6 +1,9 @@
 param(
   [string]$Region = "us-east-1",
-  [decimal]$MonthlyLimitUsd = 40,
+  [decimal]$LimitUsd = 40,
+  [ValidateSet("MONTHLY", "QUARTERLY", "ANNUALLY")]
+  [string]$TimeUnit = "ANNUALLY",
+  [string]$BudgetName = "SourceCast annual cap",
   [Parameter(Mandatory = $true)]
   [string]$AlertEmail
 )
@@ -16,18 +19,17 @@ if (-not $accountId) {
   throw "Could not resolve AWS account ID."
 }
 
-$budgetName = "SourceCast monthly cap"
 $budgetFile = New-TemporaryFile
 $notificationsFile = New-TemporaryFile
 
 try {
   @{
-    BudgetName = $budgetName
+    BudgetName = $BudgetName
     BudgetLimit = @{
-      Amount = "$MonthlyLimitUsd"
+      Amount = "$LimitUsd"
       Unit = "USD"
     }
-    TimeUnit = "MONTHLY"
+    TimeUnit = $TimeUnit
     BudgetType = "COST"
     CostFilters = @{}
   } | ConvertTo-Json -Depth 5 | Set-Content -Path $budgetFile -Encoding UTF8
@@ -83,10 +85,17 @@ try {
     --notifications-with-subscribers "file://$notificationsFile"
 
   if ($LASTEXITCODE -ne 0) {
-    throw "Failed to create AWS budget."
+    Write-Host "Budget may already exist. Updating budget limit and keeping existing notifications."
+    & aws budgets update-budget `
+      --account-id $accountId `
+      --new-budget "file://$budgetFile"
+
+    if ($LASTEXITCODE -ne 0) {
+      throw "Failed to create or update AWS budget."
+    }
   }
 
-  Write-Host "Created '$budgetName' budget for $MonthlyLimitUsd USD/month."
+  Write-Host "Configured '$BudgetName' budget for $LimitUsd USD ($TimeUnit)."
   Write-Host "AWS will send confirmation mail to $AlertEmail before alerts activate."
 } finally {
   Remove-Item $budgetFile, $notificationsFile -Force -ErrorAction SilentlyContinue
