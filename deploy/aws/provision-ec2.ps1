@@ -65,7 +65,7 @@ if ($LASTEXITCODE -ne 0 -or $existingKey -eq "None" -or -not $existingKey) {
     --region $Region `
     --key-name $KeyName `
     --query "KeyMaterial" `
-    --output text | Set-Content -NoNewline -Path $keyPath
+    --output text | Set-Content -NoNewline -Path $keyPath -Encoding ascii
   Write-Host "Saved private key to $keyPath"
 } else {
   Write-Host "Using existing key pair: $KeyName"
