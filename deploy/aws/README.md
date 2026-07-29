@@ -89,6 +89,24 @@ the same origin through Caddy.
 
 ## Start
 
+For on-demand demos, use the start helper. It starts EC2, prints the current
+`sslip.io` URL, updates the remote app origin, and health-checks the deployment:
+
+```powershell
+.\deploy\aws\start-sourcecast.ps1
+```
+
+Stop the instance when the demo is over:
+
+```powershell
+.\deploy\aws\stop-sourcecast.ps1
+```
+
+Without an Elastic IP, AWS can assign a new public IP on every stop/start. Use
+the URL printed by `start-sourcecast.ps1`.
+
+For manual startup on the instance:
+
 ```bash
 cd /opt/sourcecast/deploy/aws
 docker compose up -d --build
