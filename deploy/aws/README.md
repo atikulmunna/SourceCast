@@ -20,7 +20,10 @@ Start with `t4g.small` in a low-cost region such as `us-east-1`:
 - Enough for the hosted MVP because transcription and vector storage are
   offloaded to Groq and Qdrant Cloud.
 
-Use Ubuntu 24.04 ARM64. Allocate at least 20 GB gp3 EBS.
+Use Ubuntu 24.04 ARM64. Allocate 10 GB gp3 EBS for the portfolio demo path.
+This is enough for the Dockerized MVP, but leaves limited headroom for build
+cache and temporary audio files. Run Docker cleanup periodically if disk usage
+gets high.
 
 ## Security Group
 

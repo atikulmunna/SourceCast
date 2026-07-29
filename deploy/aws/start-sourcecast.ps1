@@ -1,6 +1,6 @@
 param(
   [string]$Region = "us-east-1",
-  [string]$InstanceId = "i-02cb5c76364e04e86",
+  [string]$InstanceId = "i-0ce4d03572b49ee4f",
   [string]$KeyPath = "",
   [string]$RemoteComposeDir = "/opt/sourcecast/deploy/aws",
   [switch]$SkipRemoteUpdate

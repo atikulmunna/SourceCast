@@ -4,7 +4,7 @@ param(
   [string]$KeyName = "sourcecast-ec2",
   [string]$SecurityGroupName = "sourcecast-ec2-sg",
   [string]$AllowedSshCidr = "",
-  [int]$VolumeSizeGb = 20
+  [int]$VolumeSizeGb = 10
 )
 
 $ErrorActionPreference = "Stop"
