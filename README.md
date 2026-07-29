@@ -1,8 +1,8 @@
 # SourceCast
 
 <p align="center">
-  <a href="https://54-164-220-16.sslip.io">
-    <img alt="Open SourceCast" src="https://img.shields.io/badge/Open%20Live%20Demo-SourceCast-007AFF?style=for-the-badge">
+  <a href="docs/DEMO_ACCESS_REQUEST.md">
+    <img alt="Request SourceCast demo access" src="https://img.shields.io/badge/Request%20Demo%20Access-SourceCast-007AFF?style=for-the-badge">
   </a>
   <a href="docs/DEMO_RUNBOOK.md">
     <img alt="Demo runbook" src="https://img.shields.io/badge/Demo-Runbook-111111?style=for-the-badge">
@@ -38,13 +38,19 @@ can inspect the supporting passage and return to the source.
 
 ## Live Demo
 
-Launch the deployed app:
+The hosted demo runs on AWS EC2 on demand. To keep AWS costs low, SourceCast does
+not use an Elastic IP, so raw `sslip.io` demo links may change after the server
+is stopped and restarted.
 
 <p>
-  <a href="https://54-164-220-16.sslip.io">
-    <img alt="Launch SourceCast" src="https://img.shields.io/badge/Launch%20SourceCast-https%3A%2F%2F54--164--220--16.sslip.io-007AFF?style=for-the-badge">
+  <a href="docs/DEMO_ACCESS_REQUEST.md">
+    <img alt="Request demo access" src="https://img.shields.io/badge/Request%20Current%20Demo%20Link-Contact%20Author-007AFF?style=for-the-badge">
   </a>
 </p>
+
+If an old demo link does not load, the server is likely stopped or AWS has
+assigned a new public IP. Contact the author for the current link and demo
+credentials.
 
 Recommended demo sources:
 

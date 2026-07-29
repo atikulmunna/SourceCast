@@ -103,7 +103,10 @@ Stop the instance when the demo is over:
 ```
 
 Without an Elastic IP, AWS can assign a new public IP on every stop/start. Use
-the URL printed by `start-sourcecast.ps1`.
+the URL printed by `start-sourcecast.ps1`. Public README links should point to
+`docs/DEMO_ACCESS_REQUEST.md` rather than a raw `sslip.io` URL, because old
+rotating-IP links cannot display an app-level notification after AWS releases
+that address.
 
 For manual startup on the instance:
 
