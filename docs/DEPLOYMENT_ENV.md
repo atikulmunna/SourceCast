@@ -57,6 +57,11 @@ in either connection string.
 SourceCast automatically detects the Supabase transaction pooler URL and disables
 asyncpg prepared-statement caching for runtime connections.
 
+To reduce the chance of a free Supabase project pausing for inactivity, add a
+GitHub repository secret named `SUPABASE_DATABASE_URL` and set it to the same
+runtime database URL. The weekly `Supabase Keepalive` workflow strips the
+`+asyncpg` driver marker and runs `select 1`.
+
 ## Redis URLs
 
 Upstash Redis typically requires TLS:

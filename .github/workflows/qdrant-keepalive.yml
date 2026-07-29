@@ -2,8 +2,8 @@ name: Qdrant Keepalive
 
 on:
   schedule:
-    # Twice a month is safely inside Qdrant's inactivity window.
-    - cron: "17 3 1,16 * *"
+    # Weekly keepalive for free-tier inactivity windows.
+    - cron: "17 3 * * 1"
   workflow_dispatch:
 
 permissions:

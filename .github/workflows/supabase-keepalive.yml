@@ -1,0 +1,46 @@
+name: Supabase Keepalive
+
+on:
+  schedule:
+    # Weekly keepalive for free-tier inactivity windows.
+    - cron: "29 3 * * 1"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  ping:
+    name: Ping Supabase Postgres
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+
+    steps:
+      - name: Validate secret
+        env:
+          SUPABASE_DATABASE_URL: ${{ secrets.SUPABASE_DATABASE_URL }}
+        run: |
+          test -n "$SUPABASE_DATABASE_URL" || { echo "SUPABASE_DATABASE_URL secret is missing"; exit 1; }
+
+      - name: Run lightweight query
+        env:
+          SUPABASE_DATABASE_URL: ${{ secrets.SUPABASE_DATABASE_URL }}
+        run: |
+          python -m pip install --quiet "psycopg[binary]>=3.2.0"
+          python - <<'PY'
+          import os
+          import psycopg
+
+          url = os.environ["SUPABASE_DATABASE_URL"].replace(
+              "postgresql+asyncpg://",
+              "postgresql://",
+              1,
+          )
+
+          with psycopg.connect(url, connect_timeout=15) as conn:
+              with conn.cursor() as cur:
+                  cur.execute("select 1")
+                  cur.fetchone()
+
+          print("Supabase keepalive query succeeded.")
+          PY
