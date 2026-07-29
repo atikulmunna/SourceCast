@@ -63,6 +63,27 @@ export default function LoginPage() {
             className="space-y-5"
             noValidate
           >
+            {!publicSignupEnabled && (
+              <div
+                className="flex items-start gap-3 rounded-lg p-4 text-sm"
+                style={{
+                  background: "rgba(0,122,255,0.08)",
+                  border: "1px solid rgba(0,122,255,0.18)",
+                  color: "var(--text-primary)",
+                }}
+              >
+                <AlertCircle
+                  size={17}
+                  className="mt-0.5 shrink-0"
+                  style={{ color: "var(--accent-strong)" }}
+                />
+                <p>
+                  SourceCast is currently invite-only. Ask the author for demo
+                  credentials.
+                </p>
+              </div>
+            )}
+
             {/* Global error */}
             {errors.root && (
               <div
@@ -188,7 +209,8 @@ export default function LoginPage() {
             className="text-center text-sm mt-6"
             style={{ color: "var(--text-muted)" }}
           >
-            Need access? Ask the author for demo credentials.
+            SourceCast is currently invite-only. Ask the author for demo
+            credentials.
           </p>
         )}
       </div>
