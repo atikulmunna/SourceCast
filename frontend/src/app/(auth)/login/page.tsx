@@ -18,6 +18,7 @@ type FormData = z.infer<typeof schema>;
 export default function LoginPage() {
   const { login } = useAuthStore();
   const router = useRouter();
+  const publicSignupEnabled = process.env.NEXT_PUBLIC_SIGNUP_ENABLED !== "false";
 
   const {
     register,
@@ -168,19 +169,28 @@ export default function LoginPage() {
           </form>
         </div>
 
-        <p
-          className="text-center text-sm mt-6"
-          style={{ color: "var(--text-muted)" }}
-        >
-          Don&apos;t have an account?{" "}
-          <Link
-            href="/register"
-            className="font-medium transition-colors hover:opacity-80"
-            style={{ color: "var(--accent-strong)" }}
+        {publicSignupEnabled ? (
+          <p
+            className="text-center text-sm mt-6"
+            style={{ color: "var(--text-muted)" }}
           >
-            Create one free
-          </Link>
-        </p>
+            Don&apos;t have an account?{" "}
+            <Link
+              href="/register"
+              className="font-medium transition-colors hover:opacity-80"
+              style={{ color: "var(--accent-strong)" }}
+            >
+              Create one free
+            </Link>
+          </p>
+        ) : (
+          <p
+            className="text-center text-sm mt-6"
+            style={{ color: "var(--text-muted)" }}
+          >
+            Need access? Ask the author for demo credentials.
+          </p>
+        )}
       </div>
     </div>
   );

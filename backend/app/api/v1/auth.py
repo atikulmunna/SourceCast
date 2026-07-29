@@ -2,6 +2,7 @@ from fastapi import APIRouter, Cookie, Request, Response, status
 
 from app.api.deps import CurrentUser, DBDep
 from app.core.config import settings
+from app.core.exceptions import ForbiddenException
 from app.schemas.auth import AuthResponse, LoginRequest, RegisterRequest, TokenResponse, UserOut
 from app.services.auth_service import AuthService
 
@@ -39,6 +40,11 @@ def _clear_refresh_cookie(response: Response) -> None:
 @router.post("/register", response_model=UserOut, status_code=status.HTTP_201_CREATED)
 async def register(data: RegisterRequest, db: DBDep) -> UserOut:
     """Register a new user account."""
+    if not settings.PUBLIC_SIGNUP_ENABLED:
+        raise ForbiddenException(
+            "SourceCast is currently invite-only. Ask the author for demo credentials."
+        )
+
     service = AuthService(db)
     return await service.register(data)
 

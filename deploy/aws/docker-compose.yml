@@ -32,6 +32,7 @@ services:
       args:
         NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-}
         NEXT_PUBLIC_APP_NAME: ${NEXT_PUBLIC_APP_NAME:-SourceCast}
+        NEXT_PUBLIC_SIGNUP_ENABLED: ${PUBLIC_SIGNUP_ENABLED:-true}
     restart: unless-stopped
     expose:
       - "3000"

@@ -31,6 +31,7 @@ type FormData = z.infer<typeof schema>;
 export default function RegisterPage() {
   const { register: registerUser } = useAuthStore();
   const router = useRouter();
+  const publicSignupEnabled = process.env.NEXT_PUBLIC_SIGNUP_ENABLED !== "false";
 
   const {
     register,
@@ -70,7 +71,9 @@ export default function RegisterPage() {
           </div>
           <h1 className="text-2xl font-semibold mb-1">Create your workspace</h1>
           <p className="text-sm" style={{ color: "var(--text-muted)" }}>
-            Free. No credit card required.
+            {publicSignupEnabled
+              ? "Free. No credit card required."
+              : "SourceCast is currently invite-only."}
           </p>
         </div>
 
@@ -78,6 +81,34 @@ export default function RegisterPage() {
         <div
           className="surface p-8"
         >
+          {!publicSignupEnabled ? (
+            <div className="space-y-5 text-center">
+              <div
+                className="flex items-start gap-3 rounded-lg p-4 text-left text-sm"
+                style={{
+                  background: "rgba(0,122,255,0.08)",
+                  border: "1px solid rgba(0,122,255,0.18)",
+                  color: "var(--text-primary)",
+                }}
+              >
+                <AlertCircle
+                  size={17}
+                  className="mt-0.5 shrink-0"
+                  style={{ color: "var(--accent-strong)" }}
+                />
+                <p>
+                  SourceCast is currently invite-only. Ask the author for demo
+                  credentials.
+                </p>
+              </div>
+              <Link
+                href="/login"
+                className="primary-button w-full"
+              >
+                Sign in <ArrowRight size={16} />
+              </Link>
+            </div>
+          ) : (
           <form
             onSubmit={handleSubmit(onSubmit)}
             className="space-y-5"
@@ -238,6 +269,7 @@ export default function RegisterPage() {
               )}
             </button>
           </form>
+          )}
         </div>
 
         <p

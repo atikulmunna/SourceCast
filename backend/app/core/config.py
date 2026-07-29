@@ -16,6 +16,7 @@ class Settings(BaseSettings):
     # ── App ──────────────────────────────────────────────────────────────────
     ENVIRONMENT: Literal["development", "production", "test"] = "development"
     DEBUG: bool = True
+    PUBLIC_SIGNUP_ENABLED: bool = True
 
     @field_validator("DEBUG", mode="before")
     @classmethod
