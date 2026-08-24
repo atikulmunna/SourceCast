@@ -29,13 +29,24 @@ jobs:
           python -m pip install --quiet "psycopg[binary]>=3.2.0"
           python - <<'PY'
           import os
+          from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
+
           import psycopg
 
-          url = os.environ["SUPABASE_DATABASE_URL"].replace(
+          raw_url = os.environ["SUPABASE_DATABASE_URL"].replace(
               "postgresql+asyncpg://",
               "postgresql://",
               1,
           )
+          parts = urlsplit(raw_url)
+          query = []
+          for key, value in parse_qsl(parts.query, keep_blank_values=True):
+              if key == "ssl":
+                  query.append(("sslmode", value))
+              elif key != "prepared_statement_cache_size":
+                  query.append((key, value))
+
+          url = urlunsplit(parts._replace(query=urlencode(query)))
 
           with psycopg.connect(url, connect_timeout=15) as conn:
               with conn.cursor() as cur:
