@@ -1,3 +1,6 @@
+import asyncio
+import time
+
 import pytest
 
 from app.services import source_preview_service
@@ -41,3 +44,38 @@ async def test_preview_source_builds_long_content_warning(monkeypatch: pytest.Mo
     assert result.processing_estimate.is_long_content is True
     assert "CPU transcription may take" in result.processing_estimate.warning
 
+
+
+@pytest.mark.asyncio
+async def test_preview_source_does_not_block_the_event_loop(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """yt-dlp does blocking network I/O. While it runs, the API's event loop must
+    keep serving other requests."""
+    ticks = 0
+    ticks_during_extract = []
+
+    class SlowYoutubeDL(FakeYoutubeDL):
+        def extract_info(self, url: str, download: bool):
+            before = ticks
+            time.sleep(0.3)  # a slow site; real yt-dlp blocks the same way
+            ticks_during_extract.append(ticks - before)
+            return super().extract_info(url, download)
+
+    async def ticker(stop: asyncio.Event) -> None:
+        nonlocal ticks
+        while not stop.is_set():
+            ticks += 1
+            await asyncio.sleep(0.01)
+
+    monkeypatch.setattr(source_preview_service.yt_dlp, "YoutubeDL", SlowYoutubeDL)
+    stop = asyncio.Event()
+    ticking = asyncio.create_task(ticker(stop))
+    await asyncio.sleep(0)  # let the ticker start
+
+    await source_preview_service.preview_source("https://youtube.com/watch?v=original")
+    stop.set()
+    await ticking
+
+    # Blocking the loop would freeze the ticker for the whole 0.3 s (0 ticks).
+    assert ticks_during_extract[0] >= 5

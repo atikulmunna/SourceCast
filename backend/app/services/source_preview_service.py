@@ -5,6 +5,7 @@ Uses yt-dlp to extract metadata from a URL (YouTube, podcast RSS, direct audio)
 without downloading the media. Returns metadata and a processing time estimate.
 """
 
+import asyncio
 from datetime import datetime, timezone
 from typing import Any
 from urllib.parse import urlencode
@@ -123,6 +124,13 @@ async def _preview_youtube_oembed(url: str) -> SourcePreviewResponse:
     )
 
 
+def _extract_info(url: str) -> dict[str, Any]:
+    """Blocking yt-dlp metadata lookup. Call it through asyncio.to_thread so the
+    API's event loop keeps serving other requests while a slow site responds."""
+    with yt_dlp.YoutubeDL(_build_ydl_opts()) as ydl:
+        return ydl.extract_info(url, download=False)
+
+
 async def preview_source(
     url: str, whisper_model: str | None = None
 ) -> SourcePreviewResponse:
@@ -133,8 +141,7 @@ async def preview_source(
     model = whisper_model or settings.WHISPER_MODEL
 
     try:
-        with yt_dlp.YoutubeDL(_build_ydl_opts()) as ydl:
-            info: dict[str, Any] = ydl.extract_info(url, download=False)
+        info = await asyncio.to_thread(_extract_info, url)
     except yt_dlp.utils.DownloadError as exc:
         if is_youtube_bot_check_error(exc) and extract_youtube_video_id(url):
             return await _preview_youtube_oembed(url)
