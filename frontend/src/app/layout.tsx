@@ -10,7 +10,7 @@ const merriweather = Merriweather({
 });
 
 export const metadata: Metadata = {
-  title: "SourceCast — Timestamp-Cited Research Assistant",
+  title: "SourceCast: Timestamp-Cited Research Assistant",
   description:
     "Ask, compare, and research long-form audio and video with timestamped evidence. Turn podcasts, YouTube lectures, and interviews into a searchable knowledge base.",
   keywords:

@@ -161,7 +161,7 @@ async def create_source_and_enqueue(
             source.id,
         )
     except Exception as exc:
-        # Redis unavailable — mark job as failed so UI can retry later
+        # Redis unavailable: mark job as failed so UI can retry later
         logger.error("Failed to enqueue job %s: %s", job.id, exc)
         job.status = "FAILED"
         job.error_code = "QUEUE_UNAVAILABLE"

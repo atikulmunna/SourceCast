@@ -5,7 +5,7 @@ Revises: 001_initial_schema
 Create Date: 2026-05-24
 
 Creates:
-- embedding_models        (no external FKs — must come first)
+- embedding_models        (no external FKs, must come first)
 - source_spaces           (FK: sources, knowledge_spaces, users)
 - ingestion_jobs          (FK: users, sources)
 - transcript_segments     (FK: sources, users)

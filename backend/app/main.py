@@ -18,7 +18,7 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
 def create_app() -> FastAPI:
     app = FastAPI(
         title="SourceCast API",
-        description="Timestamp-Cited Research Assistant — Backend API",
+        description="Timestamp-Cited Research Assistant (backend API)",
         version="0.1.0",
         docs_url="/api/docs",
         redoc_url="/api/redoc",

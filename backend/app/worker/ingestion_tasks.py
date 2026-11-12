@@ -108,7 +108,7 @@ async def ingest_source(
         job_result = await db.execute(select(IngestionJob).where(IngestionJob.id == job_uuid))
         job = job_result.scalar_one_or_none()
         if not job:
-            logger.error("Job %s not found — aborting", job_id)
+            logger.error("Job %s not found, aborting", job_id)
             return
 
         source_result = await db.execute(select(Source).where(Source.id == source_uuid))
@@ -403,7 +403,7 @@ async def ingest_source(
                 status="COMPLETED",
                 stage="completed",
                 progress=100,
-                current_step=f"Ready — {len(chunks)} chunks created.",
+                current_step=f"Ready: {len(chunks)} chunks created.",
             )
 
             logger.info(

@@ -48,7 +48,7 @@ async def create_source(
 ) -> SourceIngestResponse:
     """
     Create a source and kick off the ingestion pipeline.
-    Returns immediately with the source and job IDs — subscribe to
+    Returns immediately with the source and job IDs. Subscribe to
     GET /jobs/{job_id}/stream for real-time progress.
     """
     source, job = await create_source_and_enqueue(

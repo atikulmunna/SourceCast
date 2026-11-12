@@ -15,7 +15,7 @@ from app.worker.ingestion_tasks import ingest_source
 
 
 class WorkerSettings:
-    """Arq WorkerSettings class — arq discovers this automatically."""
+    """Arq WorkerSettings class; arq discovers this automatically."""
 
     functions = [ingest_source]
 
@@ -27,7 +27,7 @@ class WorkerSettings:
     # Slow idle polling keeps managed Redis free-tier request usage under control.
     poll_delay = settings.WORKER_POLL_DELAY_SECONDS
 
-    # Timeout per job in seconds — 2 hours for long-form content
+    # Timeout per job in seconds: 2 hours for long-form content
     job_timeout = 7200
 
     # How long to keep job results in Redis

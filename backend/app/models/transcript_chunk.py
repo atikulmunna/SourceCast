@@ -65,7 +65,7 @@ class TranscriptChunk(Base):
     )
     # Qdrant collection this chunk's vector lives in
     vector_collection: Mapped[str] = mapped_column(String(160), nullable=False, default="")
-    # Qdrant point ID — null until embedding stage completes
+    # Qdrant point ID, null until the embedding stage completes
     vector_point_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), nullable=True)
 
     created_at: Mapped[datetime] = mapped_column(
@@ -83,7 +83,7 @@ class TranscriptChunk(Base):
     def __repr__(self) -> str:
         return (
             f"<TranscriptChunk source_id={self.source_id}"
-            f" idx={self.chunk_index} [{self.start_time_sec}–{self.end_time_sec}]>"
+            f" idx={self.chunk_index} [{self.start_time_sec}s to {self.end_time_sec}s]>"
         )
 
 

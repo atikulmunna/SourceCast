@@ -73,7 +73,7 @@ def _load_model(model_name: str):
     )
     model = SentenceTransformer(model_name)
     logger.info(
-        "Model '%s' ready — embedding dim: %d", model_name, model.get_sentence_embedding_dimension()
+        "Model '%s' ready, embedding dim: %d", model_name, model.get_sentence_embedding_dimension()
     )
     return model
 
@@ -84,7 +84,7 @@ def embed_texts_sync(
 ) -> list[list[float]]:
     """
     Synchronous embedding.  Returns a list of float vectors.
-    Runs in caller's thread — call embed_texts() from async code instead.
+    Runs in the caller's thread. Call embed_texts() from async code instead.
     """
     if not texts:
         return []
@@ -107,7 +107,7 @@ async def embed_texts(
     model_name: str = DEFAULT_MODEL,
 ) -> list[list[float]]:
     """
-    Async wrapper — runs embedding in the default executor to avoid
+    Async wrapper: runs embedding in the default executor to avoid
     blocking the event loop during CPU-intensive model inference.
     """
     loop = asyncio.get_event_loop()

@@ -50,7 +50,7 @@ class TranscriptSegment(Base):
 
     # Optional: populated when speaker diarization is run (P2 feature)
     speaker_label: Mapped[str | None] = mapped_column(String(80), nullable=True)
-    # Whisper per-segment confidence, 0.0–1.0
+    # Whisper per-segment confidence, 0.0 to 1.0
     confidence_score: Mapped[Decimal | None] = mapped_column(Numeric(5, 4), nullable=True)
 
     created_at: Mapped[datetime] = mapped_column(
@@ -73,7 +73,7 @@ class TranscriptSegment(Base):
     def __repr__(self) -> str:
         return (
             f"<TranscriptSegment source_id={self.source_id}"
-            f" idx={self.segment_index} [{self.start_time_sec}–{self.end_time_sec}]>"
+            f" idx={self.segment_index} [{self.start_time_sec}s to {self.end_time_sec}s]>"
         )
 
 

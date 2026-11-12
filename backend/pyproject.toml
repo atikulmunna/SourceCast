@@ -1,7 +1,7 @@
 [project]
 name = "sourcecast-backend"
 version = "0.1.0"
-description = "SourceCast — Timestamp-Cited Research Assistant backend"
+description = "SourceCast backend: timestamp-cited research assistant"
 requires-python = ">=3.11"
 
 dependencies = [

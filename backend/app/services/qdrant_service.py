@@ -241,7 +241,7 @@ async def search(
     """
     Search for the most similar vectors, with mandatory user_id isolation.
 
-    user_id is ALWAYS injected — the frontend must never supply this.
+    user_id is ALWAYS injected; the frontend must never supply this.
     Optional space_id and source_ids further narrow the search scope.
     """
     must: list[Any] = [FieldCondition(key="user_id", match=MatchValue(value=str(user_id)))]

@@ -49,7 +49,7 @@ class User(Base):
         return f"<User id={self.id} email={self.email}>"
 
 
-# Circular import avoidance — import models here so relationships resolve
+# Circular import avoidance: import models here so relationships resolve
 from app.models.ingestion_job import IngestionJob  # noqa: E402, F401
 from app.models.chat_session import ChatSession  # noqa: E402, F401
 from app.models.knowledge_space import KnowledgeSpace  # noqa: E402, F401

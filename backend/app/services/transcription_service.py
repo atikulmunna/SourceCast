@@ -62,7 +62,7 @@ def transcribe_sync(
     progress_callback: Callable[[int, str], None] | None = None,
 ) -> list[TranscriptSegmentData]:
     """
-    Synchronous transcription — runs in a worker thread via run_in_executor.
+    Synchronous transcription: runs in a worker thread via run_in_executor.
     Returns a list of TranscriptSegmentData ordered by start time.
     """
     model = _load_model(model_size)
@@ -95,7 +95,7 @@ def transcribe_sync(
         idx = len(results)
 
         # Approximate confidence from avg_logprob (range roughly -1 to 0)
-        # Map to 0.0–1.0 clamped
+        # Map to 0.0 to 1.0, clamped
         avg_lp = getattr(raw_seg, "avg_logprob", None)
         confidence: Decimal | None = None
         if avg_lp is not None:

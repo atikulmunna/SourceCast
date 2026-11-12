@@ -1,5 +1,5 @@
 """
-Job management API — status polling and SSE progress streaming.
+Job management API: status polling and SSE progress streaming.
 
 GET  /jobs/{job_id}         → current job state (JSON)
 GET  /jobs/{job_id}/stream  → SSE progress stream
@@ -222,7 +222,7 @@ async def retry_job(
 
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
-            detail=f"Job is {job.status}, not FAILED/STALE — cannot retry.",
+            detail=f"Job is {job.status}, not FAILED/STALE, so it cannot be retried.",
         )
     if job.retry_count >= job.max_retries:
         from fastapi import HTTPException
@@ -271,7 +271,7 @@ async def cancel_job(
 
         raise HTTPException(
             status_code=status.HTTP_409_CONFLICT,
-            detail=f"Job is {job.status} — only PENDING/QUEUED jobs can be cancelled.",
+            detail=f"Job is {job.status}. Only PENDING/QUEUED jobs can be cancelled.",
         )
 
     job.status = "CANCELLED"

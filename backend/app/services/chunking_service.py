@@ -16,7 +16,7 @@ from app.services.transcription_service import TranscriptSegmentData
 
 logger = logging.getLogger(__name__)
 
-# Default target chunk size in words (~2–3 minutes of speech at avg speaking rate)
+# Default target chunk size in words (~2 to 3 minutes of speech at avg speaking rate)
 DEFAULT_TARGET_WORDS = 400
 # Number of segments to carry over into the next chunk for context continuity
 DEFAULT_OVERLAP_SEGMENTS = 2

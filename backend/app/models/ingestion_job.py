@@ -63,7 +63,7 @@ class IngestionJob(Base):
     status: Mapped[str] = mapped_column(String(40), nullable=False, default="PENDING", index=True)
     # Current named stage, e.g. "transcription", "embedding"
     stage: Mapped[str | None] = mapped_column(String(80), nullable=True)
-    # 0–100
+    # 0 to 100
     progress: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     # Human-readable message for the UI progress component
     current_step: Mapped[str | None] = mapped_column(Text, nullable=True)

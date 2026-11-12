@@ -1,5 +1,5 @@
 """
-RetrievalService — the central, mandatory-filtered retrieval gate.
+RetrievalService: the central, mandatory-filtered retrieval gate.
 
 ALL vector searches in SourceCast must go through this class.
 It automatically injects user_id into every Qdrant query so that
@@ -62,7 +62,7 @@ class RetrievalResult:
     chunk_id: uuid.UUID
     source_id: uuid.UUID
     space_id: uuid.UUID | None
-    score: float  # cosine similarity, 0.0–1.0
+    score: float  # cosine similarity, 0.0 to 1.0
     start_time_sec: Decimal
     end_time_sec: Decimal
     text: str
@@ -108,7 +108,7 @@ class RetrievalService:
     Parameters
     ----------
     user_id : uuid.UUID
-        The authenticated user — injected automatically by every endpoint
+        The authenticated user, injected automatically by every endpoint
         that instantiates this service. Never accept user_id from the client.
     collection_name : str, optional
         Defaults to the active collection from config. Pass a custom name
@@ -148,13 +148,13 @@ class RetrievalService:
         score_threshold :
             Minimum cosine similarity score.  Chunks below this are excluded.
         """
-        # 1. Embed the query (runs in executor — non-blocking)
+        # 1. Embed the query (runs in executor, non-blocking)
         query_vector = await embedding_service.embed_query(
             query_text,
             model_name=settings.DEFAULT_EMBEDDING_MODEL,
         )
 
-        # 2. Search Qdrant — user_id is ALWAYS injected here
+        # 2. Search Qdrant (user_id is ALWAYS injected here)
         scored_points = await qdrant_service.search(
             collection_name=self.collection_name,
             query_vector=query_vector,
@@ -187,7 +187,7 @@ class RetrievalService:
                     )
                 )
             except (KeyError, ValueError) as exc:
-                logger.warning("Skipping malformed Qdrant payload: %s — %s", p, exc)
+                logger.warning("Skipping malformed Qdrant payload: %s (%s)", p, exc)
 
         if settings.EMBEDDING_PROVIDER == "hash":
             results.sort(key=lambda result: result.score, reverse=True)

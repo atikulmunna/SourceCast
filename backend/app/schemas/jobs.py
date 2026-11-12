@@ -1,6 +1,6 @@
 """
 Pydantic schemas for ingestion jobs and SSE event payloads.
-Event shapes match the SRS §15.3–15.6 contracts exactly.
+Event shapes match the SRS §15.3 to 15.6 contracts exactly.
 """
 
 from __future__ import annotations
@@ -40,7 +40,7 @@ class JobOut(BaseModel):
         return self.status in ("FAILED", "STALE") and self.retry_count < self.max_retries
 
 
-# ── SSE event payloads (SRS §15.3–15.6) ───────────────────────────────────────
+# ── SSE event payloads (SRS §15.3 to 15.6) ────────────────────────────────────
 
 
 class JobProgressEvent(BaseModel):
