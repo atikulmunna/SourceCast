@@ -65,6 +65,34 @@ async def _update_job(
     await db.commit()
 
 
+async def _record_failure(
+    db: AsyncSession,
+    job: IngestionJob,
+    source: Source,
+    exc: Exception,
+) -> None:
+    """Mark the job and source FAILED, even after a database error.
+
+    A failed flush or commit leaves the session unusable until it is rolled back.
+    Rolling back also expires every loaded object, so reload the job and source
+    before writing the failure in a single commit.
+    """
+    await db.rollback()
+    await db.refresh(job)
+    await db.refresh(source)
+
+    source.status = "FAILED"
+    job.retry_count = (job.retry_count or 0) + 1
+    await _update_job(
+        db,
+        job,
+        status="FAILED",
+        stage=job.stage,
+        error_code="INGESTION_ERROR",
+        error_message=str(exc)[:500],
+    )
+
+
 async def _heartbeat(db: AsyncSession, job: IngestionJob) -> None:
     """Touch heartbeat_at without changing other fields."""
     job.heartbeat_at = _now()
@@ -420,16 +448,9 @@ async def ingest_source(
             if audio_path and audio_path.exists():
                 await audio_service.delete_audio(audio_path)
 
-            source.status = "FAILED"
-            await db.commit()
-
-            job.retry_count = (job.retry_count or 0) + 1
-            await _update_job(
-                db,
-                job,
-                status="FAILED",
-                stage=job.stage,
-                error_code="INGESTION_ERROR",
-                error_message=str(exc)[:500],
-            )
+            try:
+                await _record_failure(db, job, source, exc)
+            except Exception:
+                # Never let a bookkeeping error hide the original failure from arq.
+                logger.exception("Could not record the failure for job %s", job_id)
             raise

@@ -68,6 +68,12 @@ class FakeDB:
     async def commit(self):
         return None
 
+    async def rollback(self):
+        return None
+
+    async def refresh(self, value):
+        return None
+
 
 def source_and_job():
     user_id = uuid.uuid4()
@@ -256,6 +262,28 @@ async def test_ingestion_worker_marks_failure_and_cleans_downloaded_audio(
     assert job.retry_count == 1
     assert source.status == "FAILED"
     assert deleted == [audio_path]
+
+
+@pytest.mark.asyncio
+async def test_ingestion_worker_reraises_original_error_when_recording_failure_fails(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    source, job = source_and_job()
+    db = FakeDB(job, source, uuid.uuid4())
+
+    async def refresh_fails(value):
+        raise RuntimeError("source was deleted mid-run")
+
+    db.refresh = refresh_fails
+    monkeypatch.setattr(ingestion_tasks, "AsyncSessionLocal", lambda: db)
+
+    async def fail_download(*args, **kwargs):
+        raise RuntimeError("download failed")
+
+    monkeypatch.setattr(ingestion_tasks.audio_service, "download_audio", fail_download)
+
+    with pytest.raises(RuntimeError, match="download failed"):
+        await ingestion_tasks.ingest_source({}, str(job.id), str(source.id), str(source.user_id))
 
 
 async def async_value(value):
