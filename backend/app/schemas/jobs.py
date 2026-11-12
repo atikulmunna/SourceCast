@@ -1,7 +1,4 @@
-"""
-Pydantic schemas for ingestion jobs and SSE event payloads.
-Event shapes match the SRS §15.3 to 15.6 contracts exactly.
-"""
+"""Pydantic schemas for ingestion jobs."""
 
 from __future__ import annotations
 
@@ -39,50 +36,3 @@ class JobOut(BaseModel):
     def is_retryable(self) -> bool:
         return self.status in ("FAILED", "STALE") and self.retry_count < self.max_retries
 
-
-# ── SSE event payloads (SRS §15.3 to 15.6) ────────────────────────────────────
-
-
-class JobProgressEvent(BaseModel):
-    event: str = "job.progress"
-    job_id: str
-    source_id: str | None
-    status: str
-    stage: str | None
-    progress: int
-    message: str
-    current_step: str | None
-    estimated_seconds_remaining: int | None
-    updated_at: str
-
-
-class JobCompletedEvent(BaseModel):
-    event: str = "job.completed"
-    job_id: str
-    source_id: str | None
-    status: str = "COMPLETED"
-    progress: int = 100
-    message: str = "Source is ready for research."
-    chunk_count: int
-    duration_sec: int | None
-    audio_deleted: bool
-    updated_at: str
-
-
-class JobFailedEvent(BaseModel):
-    event: str = "job.failed"
-    job_id: str
-    source_id: str | None
-    status: str = "FAILED"
-    stage: str | None
-    error_code: str
-    message: str
-    retryable: bool
-    retry_after_seconds: int = 60
-    updated_at: str
-
-
-class JobHeartbeatEvent(BaseModel):
-    event: str = "job.heartbeat"
-    job_id: str
-    updated_at: str

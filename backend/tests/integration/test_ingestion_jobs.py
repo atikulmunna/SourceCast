@@ -16,7 +16,7 @@ from qdrant_client.models import FieldCondition, Filter, MatchValue
 from sqlalchemy import delete, func, select, update
 from sqlalchemy.exc import IntegrityError
 
-from app.api.v1.jobs import cancel_job
+from app.api.v1.jobs import cancel_job, get_job
 from app.db.session import AsyncSessionLocal
 from app.models.embedding_model import EmbeddingModel
 from app.models.ingestion_job import IngestionJob
@@ -293,5 +293,31 @@ async def test_cancel_is_refused_once_the_worker_has_started(
         async with AsyncSessionLocal() as db:
             job = await db.get(IngestionJob, job_id)
             assert job.status == "FAILED"
+    finally:
+        await _delete_user(user_id)
+
+
+@pytest.mark.asyncio
+async def test_job_polling_sees_each_status_change() -> None:
+    """Every poll of GET /jobs/{id} reads the current row. The removed SSE stream
+    reused one session, kept returning the cached row, and so never saw progress."""
+    user_id, source_id, job_id = await _create_queued_job()
+    user = SimpleNamespace(id=user_id)
+
+    try:
+        async with AsyncSessionLocal() as db:
+            assert (await get_job(job_id, user, db)).status == "QUEUED"
+
+        # The worker moves the job on and keeps its heartbeat fresh.
+        async with AsyncSessionLocal() as db:
+            await db.execute(
+                update(IngestionJob)
+                .where(IngestionJob.id == job_id)
+                .values(status="TRANSCRIBING", heartbeat_at=func.now())
+            )
+            await db.commit()
+
+        async with AsyncSessionLocal() as db:
+            assert (await get_job(job_id, user, db)).status == "TRANSCRIBING"
     finally:
         await _delete_user(user_id)

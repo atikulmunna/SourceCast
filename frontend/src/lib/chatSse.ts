@@ -1,4 +1,4 @@
-import { parseSseBuffer } from "./jobSse";
+import { parseSseBuffer } from "./sse";
 import { apiPath } from "./apiBase";
 import { ChatMessage } from "./types";
 

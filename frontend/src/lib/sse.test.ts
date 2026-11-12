@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { parseSseBuffer } from "./jobSse";
+import { parseSseBuffer } from "./sse";
 
 describe("parseSseBuffer", () => {
   it("parses a complete JSON event", () => {

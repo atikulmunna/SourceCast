@@ -1,11 +1,10 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useEffect } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { AlertTriangle, CheckCircle2, Loader2, RotateCcw } from "lucide-react";
 import api from "@/lib/api";
 import { Job } from "@/lib/types";
-import { JobStreamEvent, streamJobEvents } from "@/lib/jobSse";
 
 const TERMINAL = new Set(["COMPLETED", "FAILED", "STALE", "CANCELLED"]);
 
@@ -15,8 +14,8 @@ interface Props {
 }
 
 export function JobProgressPanel({ jobId, onDone }: Props) {
-  const queryClient = useQueryClient();
-  const [streamVersion, setStreamVersion] = useState(0);
+  // Polling is the single source of job progress. Ingestion takes minutes, so a
+  // 3 second refresh is enough, and polling stops once the job is terminal.
   const { data: job, refetch } = useQuery<Job>({
     queryKey: ["jobs", jobId],
     queryFn: async () => {
@@ -30,62 +29,12 @@ export function JobProgressPanel({ jobId, onDone }: Props) {
   });
 
   useEffect(() => {
-    const controller = new AbortController();
-
-    const updateJob = (event: JobStreamEvent) => {
-      queryClient.setQueryData<Job>(["jobs", jobId], (current) => {
-        if (!current) return current;
-
-        if (event.event === "job.completed") {
-          return {
-            ...current,
-            status: "COMPLETED",
-            progress: 100,
-            current_step: event.message ?? "Source is ready for research.",
-          };
-        }
-        if (event.event === "job.failed") {
-          return {
-            ...current,
-            status: "FAILED",
-            stage: event.stage ?? current.stage,
-            error_code: event.error_code ?? current.error_code,
-            error_message: event.message ?? current.error_message,
-            is_retryable: event.retryable ?? current.is_retryable,
-          };
-        }
-        if (event.event === "job.heartbeat") {
-          return {
-            ...current,
-            heartbeat_at: event.updated_at ?? current.heartbeat_at,
-          };
-        }
-        return {
-          ...current,
-          status: event.status ?? current.status,
-          stage: event.stage ?? current.stage,
-          progress: event.progress ?? current.progress,
-          current_step: event.current_step ?? event.message ?? current.current_step,
-          estimated_seconds_remaining:
-            event.estimated_seconds_remaining ?? current.estimated_seconds_remaining,
-        };
-      });
-    };
-
-    streamJobEvents(jobId, updateJob, controller.signal).catch(() => {
-      // Polling continues as a fallback, so a broken stream is non-fatal.
-    });
-
-    return () => controller.abort();
-  }, [jobId, queryClient, streamVersion]);
-
-  useEffect(() => {
     if (job?.status === "COMPLETED") onDone?.();
   }, [job?.status, onDone]);
 
   const retry = async () => {
     await api.post(`/jobs/${jobId}/retry`);
-    setStreamVersion((value) => value + 1);
+    // The job is QUEUED again, which restarts polling.
     refetch();
   };
 
