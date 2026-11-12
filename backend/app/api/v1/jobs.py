@@ -20,7 +20,12 @@ from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import CurrentUser, DBDep
-from app.core.exceptions import ConflictException, ForbiddenException, NotFoundException
+from app.core.exceptions import (
+    ConflictException,
+    ForbiddenException,
+    NotFoundException,
+    UpstreamServiceException,
+)
 from app.models.ingestion_job import IngestionJob
 from app.models.source import Source
 from app.schemas.jobs import JobOut
@@ -233,17 +238,9 @@ async def retry_job(
             detail=f"Job has exceeded max retries ({job.max_retries}).",
         )
 
-    redis = await create_pool(RedisSettings.from_dsn(settings.REDIS_URL))
-    arq_job = await redis.enqueue_job(
-        "ingest_source",
-        str(job.id),
-        str(job.source_id),
-        str(current_user.id),
-    )
-    await redis.aclose()
-
+    # Commit QUEUED before enqueueing. The worker only claims waiting jobs, so a
+    # fast worker must never see the old FAILED or STALE status and skip the retry.
     now = datetime.now(timezone.utc)
-    job.worker_task_id = arq_job.job_id if arq_job else None
     job.status = "QUEUED"
     job.stage = "queue"
     job.progress = 1
@@ -252,6 +249,29 @@ async def retry_job(
     job.updated_at = now
     job.error_code = None
     job.error_message = None
+    await db.commit()
+
+    try:
+        redis = await create_pool(RedisSettings.from_dsn(settings.REDIS_URL))
+        arq_job = await redis.enqueue_job(
+            "ingest_source",
+            str(job.id),
+            str(job.source_id),
+            str(current_user.id),
+        )
+        await redis.aclose()
+    except Exception as exc:
+        # Nothing reached the queue: do not leave the job QUEUED forever. It stays
+        # retryable because retry_count is unchanged.
+        job.status = "FAILED"
+        job.error_code = "QUEUE_UNAVAILABLE"
+        job.error_message = str(exc)[:300]
+        await db.commit()
+        raise UpstreamServiceException("Could not queue the job. Try again shortly.") from exc
+
+    # Only the task ID changes here, so a worker that already claimed the job
+    # keeps its status.
+    job.worker_task_id = arq_job.job_id if arq_job else None
     await db.commit()
     await db.refresh(job)
 

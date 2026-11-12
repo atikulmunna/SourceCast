@@ -1,8 +1,8 @@
-"""Worker failure and retry handling against real Postgres and Qdrant.
+"""Ingestion job lifecycle against real Postgres and Qdrant.
 
-A database error inside the pipeline leaves the SQLAlchemy session needing a
-rollback. The worker must still record the failure on the job and the source.
-A retry must replace whatever the failed attempt left behind.
+Covers failures (a database error mid-run is still recorded), retries (a retry
+replaces whatever the failed attempt left behind), and cancellation (a job is
+either cancelled before the worker claims it or claimed before a cancel lands).
 """
 
 import uuid

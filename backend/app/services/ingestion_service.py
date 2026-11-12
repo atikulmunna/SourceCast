@@ -118,11 +118,18 @@ async def create_source_and_enqueue(
     db.add(source_space)
 
     # ── Create IngestionJob ───────────────────────────────────────────────────
+    # Commit the job as QUEUED before it reaches the queue. The worker only
+    # claims waiting jobs, and writing QUEUED afterwards could overwrite the
+    # status of a worker that already started.
     job = IngestionJob(
         user_id=user_id,
         source_id=source.id,
         job_type="SOURCE_INGESTION",
-        status="PENDING",
+        status="QUEUED",
+        stage="queue",
+        progress=1,
+        current_step="Waiting for the worker to start processing...",
+        heartbeat_at=_now(),
     )
     db.add(job)
     await db.commit()
@@ -139,27 +146,6 @@ async def create_source_and_enqueue(
             str(user_id),
         )
         await redis.aclose()
-
-        # Record worker task ID and advance status
-        now = _now()
-        job.worker_task_id = arq_job.job_id if arq_job else None
-        job.status = "QUEUED"
-        job.stage = "queue"
-        job.progress = 1
-        job.current_step = "Waiting for the worker to start processing..."
-        job.heartbeat_at = now
-        job.updated_at = now
-        job.error_code = None
-        job.error_message = None
-        await db.commit()
-        await db.refresh(job)
-
-        logger.info(
-            "Enqueued ingestion job %s (arq task %s) for source %s",
-            job.id,
-            job.worker_task_id,
-            source.id,
-        )
     except Exception as exc:
         # Redis unavailable: mark job as failed so UI can retry later
         logger.error("Failed to enqueue job %s: %s", job.id, exc)
@@ -167,7 +153,19 @@ async def create_source_and_enqueue(
         job.error_code = "QUEUE_UNAVAILABLE"
         job.error_message = str(exc)[:300]
         await db.commit()
+        return source, job
 
+    # Only the task ID changes here, so a worker that already claimed the job
+    # keeps its status.
+    job.worker_task_id = arq_job.job_id if arq_job else None
+    await db.commit()
+    await db.refresh(job)
+    logger.info(
+        "Enqueued ingestion job %s (arq task %s) for source %s",
+        job.id,
+        job.worker_task_id,
+        source.id,
+    )
     return source, job
 
 

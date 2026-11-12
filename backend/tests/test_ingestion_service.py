@@ -5,6 +5,7 @@ from types import SimpleNamespace
 import pytest
 
 from app.core.exceptions import ConflictException
+from app.models.ingestion_job import IngestionJob
 from app.models.knowledge_space import KnowledgeSpace
 from app.models.source import Source
 from app.schemas.sources import ProcessingEstimate, SourcePreviewResponse
@@ -233,3 +234,50 @@ async def test_create_source_deletes_orphan_duplicate_before_reingesting(
     assert new_source is not orphan
     assert new_source.title == "Test audio"
     assert job.status == "QUEUED"
+
+
+@pytest.mark.asyncio
+async def test_create_source_commits_queued_job_before_enqueueing(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """The worker only claims PENDING or QUEUED jobs, and the API must never write
+    QUEUED after a fast worker has already started the job."""
+    user_id = uuid.uuid4()
+    space = owned_space(user_id)
+    db = FakeDB(space, None)
+    committed_statuses = []
+    real_commit = db.commit
+
+    async def commit_and_record():
+        committed_statuses.append(
+            [value.status for value in db.added if isinstance(value, IngestionJob)]
+        )
+        await real_commit()
+
+    db.commit = commit_and_record
+    seen_at_enqueue = []
+
+    class RecordingRedis(Redis):
+        async def enqueue_job(self, *args):
+            seen_at_enqueue.append(committed_statuses[-1] if committed_statuses else None)
+            return await super().enqueue_job(*args)
+
+    async def fake_preview(*args):
+        return preview()
+
+    async def fake_pool(*args):
+        return RecordingRedis()
+
+    monkeypatch.setattr(ingestion_service, "preview_source", fake_preview)
+    monkeypatch.setattr(ingestion_service, "create_pool", fake_pool)
+
+    _, job = await ingestion_service.create_source_and_enqueue(
+        db=db,
+        user_id=user_id,
+        url="https://example.com/audio.mp3",
+        space_id=space.id,
+    )
+
+    assert seen_at_enqueue == [["QUEUED"]]
+    assert job.status == "QUEUED"
+    assert job.worker_task_id == "arq-job-1"
