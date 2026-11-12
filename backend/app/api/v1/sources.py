@@ -4,8 +4,6 @@ import uuid
 from fastapi import APIRouter, Query, status
 from sqlalchemy import func, select
 
-logger = logging.getLogger(__name__)
-
 from app.api.deps import CurrentUser, DBDep
 from app.models.source import Source
 from app.schemas.sources import (
@@ -17,6 +15,8 @@ from app.schemas.sources import (
 )
 from app.services.ingestion_service import create_source_and_enqueue
 from app.services.source_preview_service import preview_source
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/sources", tags=["sources"])
 

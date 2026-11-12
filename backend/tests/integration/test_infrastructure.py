@@ -1,16 +1,13 @@
 import uuid
-from datetime import datetime, timezone
 
 import pytest
 from arq import create_pool
 from arq.constants import job_key_prefix
 from arq.connections import RedisSettings
-from qdrant_client.models import PointStruct
-from sqlalchemy import delete, select, text
+from sqlalchemy import delete, select
 
 from app.core.config import settings
 from app.db.session import AsyncSessionLocal, engine
-from app.models.ingestion_job import IngestionJob
 from app.models.chat_message import ChatMessage
 from app.models.chat_session import ChatSession
 from app.models.evidence_item import EvidenceItem

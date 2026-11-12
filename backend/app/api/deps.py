@@ -1,7 +1,7 @@
 import uuid
 from typing import Annotated
 
-from fastapi import Cookie, Depends, HTTPException, Request, status
+from fastapi import Depends, Request
 from jose import JWTError
 from sqlalchemy.ext.asyncio import AsyncSession
 

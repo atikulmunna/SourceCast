@@ -1,8 +1,10 @@
 $ErrorActionPreference = "Stop"
 
-Write-Host "Running backend tests with coverage..."
+Write-Host "Running backend lint and tests with coverage..."
 Push-Location "$PSScriptRoot\backend"
 try {
+    .\.venv\Scripts\python.exe -m ruff check .
+    if ($LASTEXITCODE -ne 0) { throw "backend lint failed" }
     .\.venv\Scripts\python.exe -m pytest -m "not integration" --cov=app --cov-report=term-missing -q
     if ($LASTEXITCODE -ne 0) { throw "backend tests failed" }
     .\.venv\Scripts\python.exe -m compileall app tests

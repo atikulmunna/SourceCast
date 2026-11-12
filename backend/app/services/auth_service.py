@@ -19,7 +19,6 @@ from app.core.security import (
     refresh_token_expiry,
     verify_password,
     verify_refresh_token,
-    settings,
 )
 from app.models.refresh_token import RefreshToken
 from app.models.user import User
