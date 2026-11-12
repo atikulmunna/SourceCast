@@ -75,6 +75,19 @@ class FakeDB:
         return None
 
 
+@pytest.fixture(autouse=True)
+def reset_calls(monkeypatch: pytest.MonkeyPatch) -> list:
+    """Record reset calls instead of running them. FakeDB answers queries by call
+    order, so the reset's own queries are covered by the integration tests."""
+    calls = []
+
+    async def record_reset(db, source):
+        calls.append(source.id)
+
+    monkeypatch.setattr(ingestion_tasks, "_reset_source_outputs", record_reset)
+    return calls
+
+
 def source_and_job():
     user_id = uuid.uuid4()
     source = Source(
@@ -113,6 +126,7 @@ def youtube_source_and_job():
 async def test_ingestion_worker_completes_pipeline_and_cleans_audio(
     monkeypatch: pytest.MonkeyPatch,
     tmp_path: Path,
+    reset_calls: list,
 ) -> None:
     source, job = source_and_job()
     db = FakeDB(job, source, uuid.uuid4())
@@ -165,6 +179,7 @@ async def test_ingestion_worker_completes_pipeline_and_cleans_audio(
 
     await ingestion_tasks.ingest_source({}, str(job.id), str(source.id), str(source.user_id))
 
+    assert reset_calls == [source.id]
     assert job.status == "COMPLETED"
     assert source.status == "READY"
     assert source.transcript_status == "TRANSCRIBED"

@@ -11,6 +11,7 @@ import pytest
 
 from app.core.config import settings
 from app.db.session import engine
+from app.services import qdrant_service
 
 LOCAL_HOSTS = {"localhost", "127.0.0.1", "::1"}
 
@@ -38,7 +39,10 @@ def _require_local_services() -> None:
 
 
 @pytest.fixture(autouse=True)
-async def _dispose_engine_after_test():
+async def _reset_clients_after_test():
     """Drop pooled connections so the next test's event loop starts clean."""
     yield
     await engine.dispose()
+    if qdrant_service._client is not None:
+        await qdrant_service._client.close()
+        qdrant_service._client = None

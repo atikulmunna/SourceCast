@@ -195,6 +195,10 @@ def build_point(
 # ── Delete ─────────────────────────────────────────────────────────────────────
 
 
+async def collection_exists(collection_name: str) -> bool:
+    return await get_client().collection_exists(collection_name)
+
+
 async def delete_by_source(
     collection_name: str,
     source_id: uuid.UUID,

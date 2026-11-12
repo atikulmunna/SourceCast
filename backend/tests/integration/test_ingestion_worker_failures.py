@@ -1,7 +1,8 @@
-"""Worker failure handling against a real Postgres database.
+"""Worker failure and retry handling against real Postgres and Qdrant.
 
 A database error inside the pipeline leaves the SQLAlchemy session needing a
 rollback. The worker must still record the failure on the job and the source.
+A retry must replace whatever the failed attempt left behind.
 """
 
 import uuid
@@ -9,15 +10,20 @@ from decimal import Decimal
 from pathlib import Path
 
 import pytest
-from sqlalchemy import delete
+from qdrant_client.models import FieldCondition, Filter, MatchValue
+from sqlalchemy import delete, func, select, update
 from sqlalchemy.exc import IntegrityError
 
 from app.db.session import AsyncSessionLocal
+from app.models.embedding_model import EmbeddingModel
 from app.models.ingestion_job import IngestionJob
 from app.models.knowledge_space import KnowledgeSpace
 from app.models.source import Source
 from app.models.source_space import SourceSpace
+from app.models.transcript_chunk import TranscriptChunk
+from app.models.transcript_segment import TranscriptSegment
 from app.models.user import User
+from app.services import chunking_service, embedding_service, qdrant_service
 from app.services.transcription_service import TranscriptSegmentData
 from app.worker import ingestion_tasks
 
@@ -54,6 +60,48 @@ async def _delete_user(user_id: uuid.UUID) -> None:
     async with AsyncSessionLocal() as db:
         await db.execute(delete(User).where(User.id == user_id))
         await db.commit()
+
+
+async def _active_embedding_model() -> EmbeddingModel:
+    async with AsyncSessionLocal() as db:
+        return await db.scalar(
+            select(EmbeddingModel).where(EmbeddingModel.is_active.is_(True)).limit(1)
+        )
+
+
+async def _output_counts(source_id: uuid.UUID, collection: str) -> tuple[int, int, int]:
+    """Return (segments, chunks, vectors) stored for one source."""
+    async with AsyncSessionLocal() as db:
+        segments = await db.scalar(
+            select(func.count())
+            .select_from(TranscriptSegment)
+            .where(TranscriptSegment.source_id == source_id)
+        )
+        chunks = await db.scalar(
+            select(func.count())
+            .select_from(TranscriptChunk)
+            .where(TranscriptChunk.source_id == source_id)
+        )
+    vectors = await qdrant_service.get_client().count(
+        collection_name=collection,
+        count_filter=Filter(
+            must=[FieldCondition(key="source_id", match=MatchValue(value=str(source_id)))]
+        ),
+        exact=True,
+    )
+    return segments, chunks, vectors.count
+
+
+def _segments(count: int) -> list[TranscriptSegmentData]:
+    return [
+        TranscriptSegmentData(
+            segment_index=index,
+            start_time_sec=Decimal(index * 10),
+            end_time_sec=Decimal(index * 10 + 10),
+            text=f"Segment {index} covers research topic number {index} in detail.",
+        )
+        for index in range(count)
+    ]
 
 
 @pytest.mark.asyncio
@@ -105,4 +153,70 @@ async def test_database_error_mid_run_still_marks_job_failed(
             assert source.status == "FAILED"
         assert not audio_path.exists()
     finally:
+        await _delete_user(user_id)
+
+
+@pytest.mark.asyncio
+async def test_retry_after_late_failure_replaces_earlier_outputs(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    user_id, source_id, job_id = await _create_queued_job()
+    model = await _active_embedding_model()
+    collection = model.qdrant_collection
+    segments = _segments(3)
+    expected_chunks = len(chunking_service.create_chunks(segments))
+    audio_path = tmp_path / "audio.mp3"
+
+    async def fake_download(source_url, job_uuid):
+        audio_path.write_bytes(b"audio")
+        return audio_path
+
+    async def fake_transcribe(*args, **kwargs):
+        return segments
+
+    async def fake_embed(texts, model_name=None):
+        return [[1.0] + [0.0] * (model.dimensions - 1) for _ in texts]
+
+    real_upsert = qdrant_service.upsert_points
+    upserts = []
+
+    async def upsert_then_drop_connection(collection_name, points, *args, **kwargs):
+        # The first upsert reaches Qdrant, then the connection drops before the
+        # worker can record which collection the chunks went into.
+        await real_upsert(collection_name, points, *args, **kwargs)
+        upserts.append(len(points))
+        if len(upserts) == 1:
+            raise RuntimeError("connection reset after upsert")
+
+    monkeypatch.setattr(ingestion_tasks.audio_service, "download_audio", fake_download)
+    monkeypatch.setattr(ingestion_tasks.transcription_service, "transcribe", fake_transcribe)
+    monkeypatch.setattr(embedding_service, "embed_texts", fake_embed)
+    monkeypatch.setattr(qdrant_service, "upsert_points", upsert_then_drop_connection)
+
+    try:
+        with pytest.raises(RuntimeError, match="connection reset after upsert"):
+            await ingestion_tasks.ingest_source({}, str(job_id), str(source_id), str(user_id))
+
+        # The failed attempt left a full set of outputs behind.
+        assert await _output_counts(source_id, collection) == (3, expected_chunks, expected_chunks)
+
+        # Same as POST /jobs/{id}/retry: re-queue the job, then the worker runs again.
+        async with AsyncSessionLocal() as db:
+            await db.execute(
+                update(IngestionJob).where(IngestionJob.id == job_id).values(status="QUEUED")
+            )
+            await db.commit()
+        await ingestion_tasks.ingest_source({}, str(job_id), str(source_id), str(user_id))
+
+        async with AsyncSessionLocal() as db:
+            job = await db.get(IngestionJob, job_id)
+            source = await db.get(Source, source_id)
+            assert job.status == "COMPLETED"
+            assert source.status == "READY"
+            assert source.indexing_status == "INDEXED"
+        # Same counts as a single clean run: nothing duplicated.
+        assert await _output_counts(source_id, collection) == (3, expected_chunks, expected_chunks)
+    finally:
+        await qdrant_service.delete_by_source(collection, source_id)
         await _delete_user(user_id)

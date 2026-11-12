@@ -14,10 +14,12 @@ import uuid
 from datetime import datetime, timezone
 from pathlib import Path
 
-from sqlalchemy import select
+from sqlalchemy import delete, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.config import settings
 from app.db.session import AsyncSessionLocal
+from app.models.embedding_model import EmbeddingModel
 from app.models.ingestion_job import IngestionJob
 from app.models.source import Source
 from app.models.transcript_chunk import TranscriptChunk
@@ -25,6 +27,7 @@ from app.models.transcript_segment import TranscriptSegment
 from app.services import (
     audio_service,
     chunking_service,
+    qdrant_service,
     transcription_service,
     youtube_caption_service,
 )
@@ -62,6 +65,44 @@ async def _update_job(
         job.error_message = error_message
     if status == "COMPLETED":
         job.completed_at = _now()
+    await db.commit()
+
+
+async def _reset_source_outputs(db: AsyncSession, source: Source) -> None:
+    """Remove what an earlier attempt left behind, so every run starts clean.
+
+    Retries reuse the same source. Leftover segments would break the
+    (source_id, segment_index) unique constraint, and leftover vectors would show
+    up twice in search results.
+    """
+    recorded = await db.execute(
+        select(TranscriptChunk.vector_collection)
+        .where(TranscriptChunk.source_id == source.id)
+        .distinct()
+    )
+    chunk_collections = set(recorded.scalars().all())
+
+    # Vectors are only written after their chunk rows, so a source without chunks
+    # has no vectors to clean up. This keeps fresh runs free of Qdrant calls.
+    if chunk_collections:
+        # A failure right after an upsert can leave vectors whose chunks never
+        # recorded a collection, so also clear the collections new vectors go to.
+        active_collection = await db.scalar(
+            select(EmbeddingModel.qdrant_collection)
+            .where(EmbeddingModel.is_active.is_(True))
+            .limit(1)
+        )
+        collections = chunk_collections | {settings.DEFAULT_QDRANT_COLLECTION}
+        if active_collection:
+            collections.add(active_collection)
+        for name in sorted(c for c in collections if c):
+            if await qdrant_service.collection_exists(name):
+                await qdrant_service.delete_by_source(name, source.id)
+
+    await db.execute(delete(TranscriptChunk).where(TranscriptChunk.source_id == source.id))
+    await db.execute(delete(TranscriptSegment).where(TranscriptSegment.source_id == source.id))
+    source.transcript_status = "NOT_STARTED"
+    source.indexing_status = "NOT_STARTED"
     await db.commit()
 
 
@@ -155,9 +196,7 @@ async def ingest_source(
 
         try:
             source.status = "PROCESSING"
-            await db.commit()
-
-            from app.core.config import settings
+            await _reset_source_outputs(db, source)  # commits
 
             # Use source language if set, otherwise auto-detect
             lang = source.language if source.language != "auto" else None
@@ -332,8 +371,7 @@ async def ingest_source(
                 current_step=f"Generating embeddings for {len(chunks)} chunks…",
             )
 
-            from app.models.embedding_model import EmbeddingModel
-            from app.services import embedding_service, qdrant_service
+            from app.services import embedding_service
 
             # Load the active embedding model from DB
             em_result = await db.execute(
