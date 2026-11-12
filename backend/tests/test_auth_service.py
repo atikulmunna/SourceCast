@@ -1,3 +1,5 @@
+import asyncio
+import time
 import uuid
 from datetime import datetime, timedelta, timezone
 from types import SimpleNamespace
@@ -170,3 +172,46 @@ async def test_logout_all_revokes_each_active_token() -> None:
     await AuthService(db).logout_all(uuid.uuid4())
 
     assert all(token.revoked_at is not None for token in tokens)
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("operation", ["login", "register"])
+async def test_password_hashing_does_not_block_the_event_loop(
+    monkeypatch: pytest.MonkeyPatch,
+    operation: str,
+) -> None:
+    """bcrypt is slow by design (about 0.3 s per call). Run on the event loop, every
+    login or signup would freeze all other API requests for that long."""
+    ticks = 0
+    ticks_during_hashing = []
+
+    def slow_bcrypt(*args):
+        before = ticks
+        time.sleep(0.3)
+        ticks_during_hashing.append(ticks - before)
+        return True if operation == "login" else "hashed-password"
+
+    async def ticker(stop: asyncio.Event) -> None:
+        nonlocal ticks
+        while not stop.is_set():
+            ticks += 1
+            await asyncio.sleep(0.01)
+
+    stop = asyncio.Event()
+    ticking = asyncio.create_task(ticker(stop))
+    await asyncio.sleep(0)  # let the ticker start
+    try:
+        if operation == "login":
+            monkeypatch.setattr(auth_service, "verify_password", slow_bcrypt)
+            await AuthService(FakeDB(user())).login("researcher@example.com", "research123")
+        else:
+            monkeypatch.setattr(auth_service, "hash_password", slow_bcrypt)
+            await AuthService(FakeDB(None)).register(
+                RegisterRequest(email="new@example.com", password="research123")
+            )
+    finally:
+        stop.set()
+        await ticking
+
+    # Blocking the loop would freeze the ticker for the whole 0.3 s (0 ticks).
+    assert ticks_during_hashing[0] >= 5

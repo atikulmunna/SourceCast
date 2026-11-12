@@ -1,5 +1,6 @@
-from datetime import datetime, timezone
+import asyncio
 import uuid
+from datetime import datetime, timezone
 
 from fastapi import Request
 from sqlalchemy import select
@@ -35,10 +36,12 @@ class AuthService:
         if result.scalar_one_or_none():
             raise ConflictException("Email already registered")
 
+        # bcrypt is slow by design, so it runs off the event loop.
+        password_hash = await asyncio.to_thread(hash_password, data.password)
         user = User(
             email=data.email,
             name=data.name,
-            password_hash=hash_password(data.password),
+            password_hash=password_hash,
             role="USER",
         )
         self.db.add(user)
@@ -56,7 +59,10 @@ class AuthService:
         result = await self.db.execute(select(User).where(User.email == email))
         user = result.scalar_one_or_none()
 
-        if not user or not verify_password(password, user.password_hash):
+        # bcrypt is slow by design, so it runs off the event loop.
+        if not user or not await asyncio.to_thread(
+            verify_password, password, user.password_hash
+        ):
             raise CredentialsException("Invalid email or password")
         if not user.is_active:
             raise ForbiddenException("Account is disabled")
