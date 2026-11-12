@@ -14,13 +14,15 @@ finally {
     Pop-Location
 }
 
-Write-Host "Running frontend lint and production build..."
+Write-Host "Running frontend tests, lint, type check and production build..."
 Push-Location "$PSScriptRoot\frontend"
 try {
     npm run test
     if ($LASTEXITCODE -ne 0) { throw "frontend tests failed" }
     npm run lint
     if ($LASTEXITCODE -ne 0) { throw "frontend lint failed" }
+    npm run typecheck
+    if ($LASTEXITCODE -ne 0) { throw "frontend type check failed" }
     npm run build
     if ($LASTEXITCODE -ne 0) { throw "frontend build failed" }
 }

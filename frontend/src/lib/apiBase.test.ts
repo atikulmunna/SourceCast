@@ -1,16 +1,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { apiPath, getApiOrigin } from "./apiBase";
 
-const originalApiUrl = process.env.NEXT_PUBLIC_API_URL;
-const originalNodeEnv = process.env.NODE_ENV;
-
 afterEach(() => {
-  if (originalApiUrl === undefined) {
-    delete process.env.NEXT_PUBLIC_API_URL;
-  } else {
-    process.env.NEXT_PUBLIC_API_URL = originalApiUrl;
-  }
-  process.env.NODE_ENV = originalNodeEnv;
   vi.unstubAllEnvs();
 });
 
@@ -30,8 +21,8 @@ describe("api base helpers", () => {
   });
 
   it("falls back to localhost only for local development", () => {
-    delete process.env.NEXT_PUBLIC_API_URL;
-    process.env.NODE_ENV = "development";
+    vi.stubEnv("NEXT_PUBLIC_API_URL", undefined);
+    vi.stubEnv("NODE_ENV", "development");
 
     expect(getApiOrigin()).toBe("http://localhost:8000");
   });
