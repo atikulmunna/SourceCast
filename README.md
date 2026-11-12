@@ -239,7 +239,7 @@ Run a local runtime smoke check when the app is running:
 ```text
 backend/        FastAPI API, worker, services, models, migrations, tests
 frontend/       Next.js app, components, client state, frontend tests
-docs/           Deployment notes, acceptance checklist, demo runbook
+docs/           Deployment notes, demo runbook, demo access
 deploy/aws/     AWS EC2 Docker Compose deployment bundle
 docker-compose.yml
 check_quality.ps1

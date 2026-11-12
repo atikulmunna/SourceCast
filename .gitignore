@@ -1,5 +1,23 @@
-# Private product documents
-SourceCast_SRS*.md
+# Private planning documents (local only, never pushed)
+# SRS and specs
+*[Ss][Rr][Ss]*
+*.spec.md
+docs/specs/
+# Task tracking and plans
+[Tt][Aa][Ss][Kk].md
+[Tt][Aa][Ss][Kk][Ss].md
+PLAN.md
+*_PLAN.md
+docs/plans/
+docs/superpowers/
+docs/MVP_ACCEPTANCE_CHECKLIST.md
+# AI assistant instructions and local settings
+CLAUDE.md
+CLAUDE.local.md
+AGENTS.md
+.claude/
+# Demo credentials
+DEMO_ACCESS.md
 
 # Local environment and secrets
 .env
@@ -30,8 +48,6 @@ frontend/coverage/
 frontend/*.tsbuildinfo
 
 # Temporary and generated files
-TASK.md
-DEMO_ACCESS.md
 backend/tmp/
 nul
 backend/nul
@@ -44,5 +60,4 @@ deploy/aws/*.pub
 Thumbs.db
 .idea/
 .vscode/
-frontend/AGENTS.md
-frontend/CLAUDE.md
+desktop.ini
