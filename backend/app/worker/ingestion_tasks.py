@@ -1,9 +1,12 @@
 """
 Arq ingestion worker task.
 
-Implements the full Phase 2 ingestion pipeline:
-  PENDING → QUEUED → DOWNLOADING → TRANSCRIBING → SEGMENTING
-         → CHUNKING → CLEANING_UP → COMPLETED / FAILED
+One run takes a queued source to READY:
+
+  claim → reset → captions (YouTube) or download + transcribe → save segments
+        → save chunks → embed + index → clean up audio → COMPLETED
+
+Any failure marks the job and source FAILED and re-raises for arq.
 """
 
 from __future__ import annotations
@@ -11,8 +14,11 @@ from __future__ import annotations
 import asyncio
 import logging
 import uuid
+from collections.abc import Awaitable
+from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
+from typing import TypeVar
 
 from sqlalchemy import delete, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -22,22 +28,43 @@ from app.db.session import AsyncSessionLocal
 from app.models.embedding_model import EmbeddingModel
 from app.models.ingestion_job import IngestionJob
 from app.models.source import Source
+from app.models.source_space import SourceSpace
 from app.models.transcript_chunk import TranscriptChunk
 from app.models.transcript_segment import TranscriptSegment
 from app.services import (
     audio_service,
     chunking_service,
+    embedding_service,
     qdrant_service,
     transcription_service,
     youtube_caption_service,
 )
+from app.services.chunking_service import ChunkData
 from app.services.job_service import WAITING_JOB_STATUSES
+from app.services.transcription_service import TranscriptSegmentData
 
 logger = logging.getLogger(__name__)
+
+T = TypeVar("T")
 
 
 def _now() -> datetime:
     return datetime.now(timezone.utc)
+
+
+@dataclass
+class _Run:
+    """State shared by the stages of one ingestion run."""
+
+    db: AsyncSession
+    job: IngestionJob
+    source: Source
+    user_id: uuid.UUID
+    # Set as soon as audio is downloaded, so a later failure can still delete it.
+    audio_path: Path | None = None
+
+
+# ── Job bookkeeping ────────────────────────────────────────────────────────────
 
 
 async def _update_job(
@@ -52,7 +79,7 @@ async def _update_job(
     error_code: str | None = None,
     error_message: str | None = None,
 ) -> None:
-    """Update a job row and commit immediately so the SSE poller sees changes."""
+    """Update a job row and commit immediately so polling clients see changes."""
     job.status = status
     job.stage = stage
     job.progress = progress
@@ -94,44 +121,6 @@ async def _claim_job(db: AsyncSession, job: IngestionJob, *, status: str, stage:
     await db.commit()
     await db.refresh(job)
     return result.rowcount == 1
-
-
-async def _reset_source_outputs(db: AsyncSession, source: Source) -> None:
-    """Remove what an earlier attempt left behind, so every run starts clean.
-
-    Retries reuse the same source. Leftover segments would break the
-    (source_id, segment_index) unique constraint, and leftover vectors would show
-    up twice in search results.
-    """
-    recorded = await db.execute(
-        select(TranscriptChunk.vector_collection)
-        .where(TranscriptChunk.source_id == source.id)
-        .distinct()
-    )
-    chunk_collections = set(recorded.scalars().all())
-
-    # Vectors are only written after their chunk rows, so a source without chunks
-    # has no vectors to clean up. This keeps fresh runs free of Qdrant calls.
-    if chunk_collections:
-        # A failure right after an upsert can leave vectors whose chunks never
-        # recorded a collection, so also clear the collections new vectors go to.
-        active_collection = await db.scalar(
-            select(EmbeddingModel.qdrant_collection)
-            .where(EmbeddingModel.is_active.is_(True))
-            .limit(1)
-        )
-        collections = chunk_collections | {settings.DEFAULT_QDRANT_COLLECTION}
-        if active_collection:
-            collections.add(active_collection)
-        for name in sorted(c for c in collections if c):
-            if await qdrant_service.collection_exists(name):
-                await qdrant_service.delete_by_source(name, source.id)
-
-    await db.execute(delete(TranscriptChunk).where(TranscriptChunk.source_id == source.id))
-    await db.execute(delete(TranscriptSegment).where(TranscriptSegment.source_id == source.id))
-    source.transcript_status = "NOT_STARTED"
-    source.indexing_status = "NOT_STARTED"
-    await db.commit()
 
 
 async def _record_failure(
@@ -183,33 +172,350 @@ async def _heartbeat_until_stopped(
             await _heartbeat(db, job)
 
 
+async def _with_heartbeat(run: _Run, operation: Awaitable[T]) -> T:
+    """Await a long operation while keeping the job's heartbeat fresh."""
+    stop = asyncio.Event()
+    heartbeat = asyncio.create_task(_heartbeat_until_stopped(run.db, run.job, stop))
+    try:
+        return await operation
+    finally:
+        stop.set()
+        await heartbeat
+
+
+# ── Stages ─────────────────────────────────────────────────────────────────────
+
+
+async def _reset_source_outputs(db: AsyncSession, source: Source) -> None:
+    """Remove what an earlier attempt left behind, so every run starts clean.
+
+    Retries reuse the same source. Leftover segments would break the
+    (source_id, segment_index) unique constraint, and leftover vectors would show
+    up twice in search results.
+    """
+    recorded = await db.execute(
+        select(TranscriptChunk.vector_collection)
+        .where(TranscriptChunk.source_id == source.id)
+        .distinct()
+    )
+    chunk_collections = set(recorded.scalars().all())
+
+    # Vectors are only written after their chunk rows, so a source without chunks
+    # has no vectors to clean up. This keeps fresh runs free of Qdrant calls.
+    if chunk_collections:
+        # A failure right after an upsert can leave vectors whose chunks never
+        # recorded a collection, so also clear the collections new vectors go to.
+        active_collection = await db.scalar(
+            select(EmbeddingModel.qdrant_collection)
+            .where(EmbeddingModel.is_active.is_(True))
+            .limit(1)
+        )
+        collections = chunk_collections | {settings.DEFAULT_QDRANT_COLLECTION}
+        if active_collection:
+            collections.add(active_collection)
+        for name in sorted(c for c in collections if c):
+            if await qdrant_service.collection_exists(name):
+                await qdrant_service.delete_by_source(name, source.id)
+
+    await db.execute(delete(TranscriptChunk).where(TranscriptChunk.source_id == source.id))
+    await db.execute(delete(TranscriptSegment).where(TranscriptSegment.source_id == source.id))
+    source.transcript_status = "NOT_STARTED"
+    source.indexing_status = "NOT_STARTED"
+    await db.commit()
+
+
+async def _fetch_caption_segments(
+    run: _Run, language: str | None
+) -> list[TranscriptSegmentData]:
+    """Try YouTube captions first. Returns [] to fall back to audio transcription."""
+    await _update_job(
+        run.db,
+        run.job,
+        status="TRANSCRIBING",
+        stage="transcription",
+        progress=10,
+        current_step="Checking YouTube captions…",
+    )
+    async def extract() -> list[TranscriptSegmentData]:
+        # Only extraction errors fall back to audio; a heartbeat error still fails the job.
+        try:
+            return await youtube_caption_service.extract_caption_segments(
+                run.source.source_url,
+                language=language,
+            )
+        except Exception as exc:
+            logger.warning(
+                "YouTube caption extraction failed for source %s; falling back to audio: %s",
+                run.source.id,
+                exc,
+            )
+            return []
+
+    segments = await _with_heartbeat(run, extract())
+    if segments:
+        run.source.transcript_status = "TRANSCRIBED"
+        await run.db.commit()
+    return segments
+
+
+async def _download_audio(run: _Run) -> None:
+    await _update_job(
+        run.db,
+        run.job,
+        status="DOWNLOADING",
+        stage="download",
+        progress=5,
+        current_step="Downloading audio…",
+    )
+    run.audio_path = await _with_heartbeat(
+        run, audio_service.download_audio(run.source.source_url, run.job.id)
+    )
+    run.source.audio_file_url = str(run.audio_path)
+    await run.db.commit()
+
+
+async def _transcribe_audio(run: _Run, language: str | None) -> list[TranscriptSegmentData]:
+    await _update_job(
+        run.db,
+        run.job,
+        status="TRANSCRIBING",
+        stage="transcription",
+        progress=15,
+        current_step=(
+            "Submitting audio to hosted transcription…"
+            if settings.TRANSCRIPTION_PROVIDER == "groq"
+            else "Loading Whisper model…"
+        ),
+    )
+
+    def on_progress(pct: int, msg: str) -> None:
+        """Called from the transcription thread; heartbeat keeps the job alive."""
+        logger.debug("Transcription progress %d%%: %s", pct, msg)
+
+    segments = await _with_heartbeat(
+        run,
+        transcription_service.transcribe(
+            run.audio_path,
+            model_size=settings.WHISPER_MODEL,
+            language=language,
+            progress_callback=on_progress,
+        ),
+    )
+    run.source.transcript_status = "TRANSCRIBED"
+    await run.db.commit()
+    return segments
+
+
+async def _save_segments(run: _Run, segments: list[TranscriptSegmentData]) -> None:
+    await _update_job(
+        run.db,
+        run.job,
+        status="SEGMENTING",
+        stage="segmentation",
+        progress=65,
+        current_step=f"Saving {len(segments)} transcript segments…",
+    )
+    for seg_data in segments:
+        run.db.add(
+            TranscriptSegment(
+                source_id=run.source.id,
+                user_id=run.user_id,
+                segment_index=seg_data.segment_index,
+                start_time_sec=seg_data.start_time_sec,
+                end_time_sec=seg_data.end_time_sec,
+                text=seg_data.text,
+                confidence_score=seg_data.confidence_score,
+            )
+        )
+    await run.db.commit()
+    logger.info("Saved %d transcript segments for source %s", len(segments), run.source.id)
+
+
+async def _save_chunks(run: _Run, segments: list[TranscriptSegmentData]) -> list[ChunkData]:
+    await _update_job(
+        run.db,
+        run.job,
+        status="CHUNKING",
+        stage="chunking",
+        progress=75,
+        current_step="Merging segments into chunks…",
+    )
+
+    # Chunks carry the source's (first) space for space-scoped retrieval.
+    link = await run.db.execute(
+        select(SourceSpace).where(SourceSpace.source_id == run.source.id).limit(1)
+    )
+    source_space = link.scalar_one_or_none()
+    space_id = source_space.space_id if source_space else None
+
+    chunks = chunking_service.create_chunks(segments)
+    for chunk_data in chunks:
+        run.db.add(
+            TranscriptChunk(
+                source_id=run.source.id,
+                user_id=run.user_id,
+                space_id=space_id,
+                chunk_index=chunk_data.chunk_index,
+                start_time_sec=chunk_data.start_time_sec,
+                end_time_sec=chunk_data.end_time_sec,
+                text=chunk_data.text,
+                token_count=chunk_data.token_count,
+                # Filled in once the chunk's vector is indexed.
+                vector_collection="",
+            )
+        )
+    await run.db.commit()
+    logger.info("Saved %d transcript chunks for source %s", len(chunks), run.source.id)
+    return chunks
+
+
+async def _embed_and_index(run: _Run, chunk_count: int) -> None:
+    await _update_job(
+        run.db,
+        run.job,
+        status="EMBEDDING",
+        stage="embedding",
+        progress=80,
+        current_step=f"Generating embeddings for {chunk_count} chunks…",
+    )
+
+    em_result = await run.db.execute(
+        select(EmbeddingModel).where(EmbeddingModel.is_active.is_(True)).limit(1)
+    )
+    em = em_result.scalar_one_or_none()
+    model_name = em.name if em else "all-MiniLM-L6-v2"
+    collection_name = em.qdrant_collection if em else "source_chunks_v1_minilm_384"
+    dimensions = em.dimensions if em else 384
+    distance = em.distance_metric if em else "Cosine"
+
+    await qdrant_service.ensure_collection(collection_name, dimensions, distance)
+
+    # Reload the chunks to get their database IDs, which double as point IDs.
+    chunks_result = await run.db.execute(
+        select(TranscriptChunk)
+        .where(TranscriptChunk.source_id == run.source.id)
+        .order_by(TranscriptChunk.chunk_index)
+    )
+    db_chunks = chunks_result.scalars().all()
+
+    vectors = await embedding_service.embed_texts(
+        [c.text for c in db_chunks], model_name=model_name
+    )
+    points = [
+        qdrant_service.build_point(
+            vector=vectors[i],
+            chunk_id=c.id,
+            source_id=run.source.id,
+            user_id=run.user_id,
+            space_id=c.space_id,
+            chunk_index=c.chunk_index,
+            start_time_sec=float(c.start_time_sec),
+            end_time_sec=float(c.end_time_sec),
+            text=c.text,
+            source_title=run.source.title,
+        )
+        for i, c in enumerate(db_chunks)
+    ]
+
+    await _update_job(
+        run.db,
+        run.job,
+        status="INDEXING",
+        stage="indexing",
+        progress=87,
+        current_step=f"Uploading {len(points)} vectors to Qdrant…",
+    )
+    await qdrant_service.upsert_points(collection_name, points)
+
+    for c in db_chunks:
+        c.vector_point_id = c.id  # point ID == chunk ID
+        c.vector_collection = collection_name
+        c.embedding_model_id = em.id if em else None
+    await run.db.commit()
+
+    run.source.indexing_status = "INDEXED"
+    await run.db.commit()
+    logger.info("Indexed %d vectors for source %s", len(points), run.source.id)
+
+
+async def _clean_up_audio(run: _Run) -> None:
+    await _update_job(
+        run.db,
+        run.job,
+        status="CLEANING_UP",
+        stage="cleanup",
+        progress=90,
+        current_step="Cleaning up temporary audio…",
+    )
+    if (
+        run.source.audio_storage_policy == "DELETE_AFTER_TRANSCRIPTION"
+        and run.audio_path is not None
+    ):
+        if await audio_service.delete_audio(run.audio_path):
+            run.source.audio_file_url = None
+            run.source.audio_deleted_at = _now()
+            await run.db.commit()
+
+
+async def _complete(run: _Run, *, segment_count: int, chunk_count: int) -> None:
+    run.source.status = "READY"
+    await run.db.commit()
+    await _update_job(
+        run.db,
+        run.job,
+        status="COMPLETED",
+        stage="completed",
+        progress=100,
+        current_step=f"Ready: {chunk_count} chunks created.",
+    )
+    logger.info(
+        "Ingestion complete for source %s: %d segments, %d chunks",
+        run.source.id,
+        segment_count,
+        chunk_count,
+    )
+
+
+async def _run_pipeline(run: _Run, *, uses_captions: bool) -> None:
+    run.source.status = "PROCESSING"
+    await _reset_source_outputs(run.db, run.source)  # commits
+
+    # Use the source language if set, otherwise let transcription auto-detect.
+    language = run.source.language if run.source.language != "auto" else None
+
+    segments = await _fetch_caption_segments(run, language) if uses_captions else []
+    if not segments:
+        await _download_audio(run)
+        segments = await _transcribe_audio(run, language)
+
+    await _save_segments(run, segments)
+    chunks = await _save_chunks(run, segments)
+    await _embed_and_index(run, chunk_count=len(chunks))
+    await _clean_up_audio(run)
+    await _complete(run, segment_count=len(segments), chunk_count=len(chunks))
+
+
+# ── Task entry point ───────────────────────────────────────────────────────────
+
+
 async def ingest_source(
     ctx: dict,
     job_id: str,
     source_id: str,
     user_id: str,
 ) -> None:
-    """
-    Main ingestion pipeline task.
-
-    ctx is provided by arq and contains the db session factory via startup hook.
-    """
-    job_uuid = uuid.UUID(job_id)
-    source_uuid = uuid.UUID(source_id)
-    user_uuid = uuid.UUID(user_id)
-
-    audio_path: Path | None = None
-
+    """Ingest one source. arq calls this with the job, source and user IDs."""
     async with AsyncSessionLocal() as db:
-        # ── Load job and source ───────────────────────────────────────────────
-        job_result = await db.execute(select(IngestionJob).where(IngestionJob.id == job_uuid))
-        job = job_result.scalar_one_or_none()
+        job = (
+            await db.execute(select(IngestionJob).where(IngestionJob.id == uuid.UUID(job_id)))
+        ).scalar_one_or_none()
         if not job:
             logger.error("Job %s not found, aborting", job_id)
             return
 
-        source_result = await db.execute(select(Source).where(Source.id == source_uuid))
-        source = source_result.scalar_one_or_none()
+        source = (
+            await db.execute(select(Source).where(Source.id == uuid.UUID(source_id)))
+        ).scalar_one_or_none()
         if not source:
             await _update_job(
                 db,
@@ -231,297 +537,15 @@ async def ingest_source(
             logger.info("Job %s is %s, not waiting to run; skipping it", job_id, job.status)
             return
 
+        run = _Run(db=db, job=job, source=source, user_id=uuid.UUID(user_id))
         try:
-            source.status = "PROCESSING"
-            await _reset_source_outputs(db, source)  # commits
-
-            # Use source language if set, otherwise auto-detect
-            lang = source.language if source.language != "auto" else None
-            segments: list[transcription_service.TranscriptSegmentData] = []
-
-            if uses_captions:
-                await _update_job(
-                    db,
-                    job,
-                    status="TRANSCRIBING",
-                    stage="transcription",
-                    progress=10,
-                    current_step="Checking YouTube captions…",
-                )
-                heartbeat_stop = asyncio.Event()
-                heartbeat_task = asyncio.create_task(
-                    _heartbeat_until_stopped(db, job, heartbeat_stop)
-                )
-                try:
-                    segments = await youtube_caption_service.extract_caption_segments(
-                        source.source_url,
-                        language=lang,
-                    )
-                except Exception as exc:
-                    logger.warning(
-                        "YouTube caption extraction failed for source %s; falling back to audio: %s",
-                        source_id,
-                        exc,
-                    )
-                finally:
-                    heartbeat_stop.set()
-                    await heartbeat_task
-
-                if segments:
-                    source.transcript_status = "TRANSCRIBED"
-                    await db.commit()
-
-            if not segments:
-                # ── Stage 1: DOWNLOADING ──────────────────────────────────────
-                await _update_job(
-                    db,
-                    job,
-                    status="DOWNLOADING",
-                    stage="download",
-                    progress=5,
-                    current_step="Downloading audio…",
-                )
-
-                heartbeat_stop = asyncio.Event()
-                heartbeat_task = asyncio.create_task(
-                    _heartbeat_until_stopped(db, job, heartbeat_stop)
-                )
-                try:
-                    audio_path = await audio_service.download_audio(source.source_url, job_uuid)
-                finally:
-                    heartbeat_stop.set()
-                    await heartbeat_task
-                source.audio_file_url = str(audio_path)
-                await db.commit()
-
-                # ── Stage 2: TRANSCRIBING ─────────────────────────────────────
-                await _update_job(
-                    db,
-                    job,
-                    status="TRANSCRIBING",
-                    stage="transcription",
-                    progress=15,
-                    current_step=(
-                        "Submitting audio to hosted transcription…"
-                        if settings.TRANSCRIPTION_PROVIDER == "groq"
-                        else "Loading Whisper model…"
-                    ),
-                )
-
-                # Determine model from job metadata or fall back to config
-                model_size = settings.WHISPER_MODEL
-
-                def on_progress(pct: int, msg: str) -> None:
-                    """Called from the transcription thread; heartbeat keeps the job alive."""
-                    logger.debug("Transcription progress %d%%: %s", pct, msg)
-
-                heartbeat_stop = asyncio.Event()
-                heartbeat_task = asyncio.create_task(
-                    _heartbeat_until_stopped(db, job, heartbeat_stop)
-                )
-                try:
-                    segments = await transcription_service.transcribe(
-                        audio_path,
-                        model_size=model_size,
-                        language=lang,
-                        progress_callback=on_progress,
-                    )
-                finally:
-                    heartbeat_stop.set()
-                    await heartbeat_task
-                source.transcript_status = "TRANSCRIBED"
-                await db.commit()
-
-            # ── Stage 3: SEGMENTING ────────────────────────────────────────────
-            await _update_job(
-                db,
-                job,
-                status="SEGMENTING",
-                stage="segmentation",
-                progress=65,
-                current_step=f"Saving {len(segments)} transcript segments…",
-            )
-
-            db_segments: list[TranscriptSegment] = []
-            for seg_data in segments:
-                db_seg = TranscriptSegment(
-                    source_id=source_uuid,
-                    user_id=user_uuid,
-                    segment_index=seg_data.segment_index,
-                    start_time_sec=seg_data.start_time_sec,
-                    end_time_sec=seg_data.end_time_sec,
-                    text=seg_data.text,
-                    confidence_score=seg_data.confidence_score,
-                )
-                db.add(db_seg)
-                db_segments.append(db_seg)
-
-            await db.commit()
-            logger.info("Saved %d transcript segments for source %s", len(db_segments), source_id)
-
-            # ── Stage 4: CHUNKING ──────────────────────────────────────────────
-            await _update_job(
-                db,
-                job,
-                status="CHUNKING",
-                stage="chunking",
-                progress=75,
-                current_step="Merging segments into chunks…",
-            )
-
-            # Determine the space_id for this source (use first linked space)
-            from app.models.source_space import SourceSpace
-
-            ss_result = await db.execute(
-                select(SourceSpace).where(SourceSpace.source_id == source_uuid).limit(1)
-            )
-            ss = ss_result.scalar_one_or_none()
-            space_id = ss.space_id if ss else None
-
-            chunks = chunking_service.create_chunks(segments)
-
-            for chunk_data in chunks:
-                db_chunk = TranscriptChunk(
-                    source_id=source_uuid,
-                    user_id=user_uuid,
-                    space_id=space_id,
-                    chunk_index=chunk_data.chunk_index,
-                    start_time_sec=chunk_data.start_time_sec,
-                    end_time_sec=chunk_data.end_time_sec,
-                    text=chunk_data.text,
-                    token_count=chunk_data.token_count,
-                    # vector fields remain null until Phase 3 embedding stage
-                    vector_collection="",
-                )
-                db.add(db_chunk)
-
-            await db.commit()
-            logger.info("Saved %d transcript chunks for source %s", len(chunks), source_id)
-
-            # ── Stage 5: EMBEDDING ─────────────────────────────────────────────
-            await _update_job(
-                db,
-                job,
-                status="EMBEDDING",
-                stage="embedding",
-                progress=80,
-                current_step=f"Generating embeddings for {len(chunks)} chunks…",
-            )
-
-            from app.services import embedding_service
-
-            # Load the active embedding model from DB
-            em_result = await db.execute(
-                select(EmbeddingModel).where(EmbeddingModel.is_active == True).limit(1)  # noqa: E712
-            )
-            em = em_result.scalar_one_or_none()
-            model_name = em.name if em else "all-MiniLM-L6-v2"
-            collection_name = em.qdrant_collection if em else "source_chunks_v1_minilm_384"
-            dimensions = em.dimensions if em else 384
-            distance = em.distance_metric if em else "Cosine"
-
-            # Ensure Qdrant collection exists
-            await qdrant_service.ensure_collection(collection_name, dimensions, distance)
-
-            # Reload chunks fresh from DB to get their IDs
-            chunks_result = await db.execute(
-                select(TranscriptChunk)
-                .where(TranscriptChunk.source_id == source_uuid)
-                .order_by(TranscriptChunk.chunk_index)
-            )
-            db_chunks = chunks_result.scalars().all()
-
-            # Embed all chunk texts in one batch call (runs in executor)
-            texts = [c.text for c in db_chunks]
-            vectors = await embedding_service.embed_texts(texts, model_name=model_name)
-
-            # Build Qdrant points
-            points = [
-                qdrant_service.build_point(
-                    vector=vectors[i],
-                    chunk_id=c.id,
-                    source_id=source_uuid,
-                    user_id=user_uuid,
-                    space_id=c.space_id,
-                    chunk_index=c.chunk_index,
-                    start_time_sec=float(c.start_time_sec),
-                    end_time_sec=float(c.end_time_sec),
-                    text=c.text,
-                    source_title=source.title,
-                )
-                for i, c in enumerate(db_chunks)
-            ]
-
-            # ── Stage 6: INDEXING ──────────────────────────────────────────────
-            await _update_job(
-                db,
-                job,
-                status="INDEXING",
-                stage="indexing",
-                progress=87,
-                current_step=f"Uploading {len(points)} vectors to Qdrant…",
-            )
-
-            await qdrant_service.upsert_points(collection_name, points)
-
-            # Write vector_point_id and collection back to each TranscriptChunk
-            for i, c in enumerate(db_chunks):
-                c.vector_point_id = c.id  # point ID == chunk ID
-                c.vector_collection = collection_name
-                c.embedding_model_id = em.id if em else None
-            await db.commit()
-
-            source.indexing_status = "INDEXED"
-            await db.commit()
-            logger.info("Indexed %d vectors for source %s", len(points), source_id)
-
-            # ── Stage 7: CLEANING_UP ───────────────────────────────────────────
-            await _update_job(
-                db,
-                job,
-                status="CLEANING_UP",
-                stage="cleanup",
-                progress=90,
-                current_step="Cleaning up temporary audio…",
-            )
-
-            audio_deleted = False
-            if (
-                source.audio_storage_policy == "DELETE_AFTER_TRANSCRIPTION"
-                and audio_path is not None
-            ):
-                audio_deleted = await audio_service.delete_audio(audio_path)
-                if audio_deleted:
-                    source.audio_file_url = None
-                    source.audio_deleted_at = _now()
-                    await db.commit()
-
-            # ── Stage 6: COMPLETED ─────────────────────────────────────────────
-            source.status = "READY"
-            await db.commit()
-
-            await _update_job(
-                db,
-                job,
-                status="COMPLETED",
-                stage="completed",
-                progress=100,
-                current_step=f"Ready: {len(chunks)} chunks created.",
-            )
-
-            logger.info(
-                "Ingestion complete for source %s: %d segments, %d chunks",
-                source_id,
-                len(segments),
-                len(chunks),
-            )
-
+            await _run_pipeline(run, uses_captions=uses_captions)
         except Exception as exc:
             logger.exception("Ingestion failed for job %s: %s", job_id, exc)
 
             # Best-effort audio cleanup on failure
-            if audio_path and audio_path.exists():
-                await audio_service.delete_audio(audio_path)
+            if run.audio_path and run.audio_path.exists():
+                await audio_service.delete_audio(run.audio_path)
 
             try:
                 await _record_failure(db, job, source, exc)
