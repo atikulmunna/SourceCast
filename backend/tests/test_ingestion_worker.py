@@ -250,6 +250,60 @@ async def test_ingestion_worker_uses_youtube_captions_without_downloading_audio(
 
 
 @pytest.mark.asyncio
+async def test_ingestion_worker_falls_back_to_audio_when_captions_fail(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    source, job = youtube_source_and_job()
+    db = FakeDB(job, source, uuid.uuid4())
+    audio_path = tmp_path / "audio.mp3"
+    audio_path.write_bytes(b"audio")
+    segments = [
+        TranscriptSegmentData(
+            segment_index=0,
+            start_time_sec=Decimal("0"),
+            end_time_sec=Decimal("4"),
+            text="Transcribed evidence.",
+        )
+    ]
+    downloads = []
+    uploaded = []
+
+    async def captions_blocked(*args, **kwargs):
+        raise RuntimeError("YouTube blocked the caption request")
+
+    monkeypatch.setattr(ingestion_tasks, "AsyncSessionLocal", lambda: db)
+    monkeypatch.setattr(
+        ingestion_tasks.youtube_caption_service, "extract_caption_segments", captions_blocked
+    )
+    monkeypatch.setattr(
+        ingestion_tasks.audio_service,
+        "download_audio",
+        lambda *args: record_async(downloads, args, audio_path),
+    )
+    monkeypatch.setattr(ingestion_tasks.audio_service, "delete_audio", lambda path: async_value(True))
+    monkeypatch.setattr(
+        ingestion_tasks.transcription_service,
+        "transcribe",
+        lambda *args, **kwargs: async_value(segments),
+    )
+
+    from app.services import embedding_service, qdrant_service
+
+    monkeypatch.setattr(embedding_service, "embed_texts", lambda *args, **kwargs: async_value([[0.1]]))
+    monkeypatch.setattr(qdrant_service, "ensure_collection", lambda *args: async_value(None))
+    monkeypatch.setattr(qdrant_service, "upsert_points", lambda name, points: record_async(uploaded, points, None))
+
+    await ingestion_tasks.ingest_source({}, str(job.id), str(source.id), str(source.user_id))
+
+    assert len(downloads) == 1
+    assert job.status == "COMPLETED"
+    assert source.status == "READY"
+    assert source.transcript_status == "TRANSCRIBED"
+    assert len(uploaded[0]) == 1
+
+
+@pytest.mark.asyncio
 async def test_ingestion_worker_marks_failure_and_cleans_downloaded_audio(
     monkeypatch: pytest.MonkeyPatch,
     tmp_path: Path,
