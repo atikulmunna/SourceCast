@@ -5,16 +5,21 @@ from types import SimpleNamespace
 
 import pytest
 
+from app.models.embedding_model import EmbeddingModel
 from app.models.ingestion_job import IngestionJob
 from app.models.source import Source
+from app.models.source_space import SourceSpace
+from app.models.transcript_chunk import TranscriptChunk
 from app.services.chunking_service import ChunkData
+from app.services.job_service import WAITING_JOB_STATUSES
 from app.services.transcription_service import TranscriptSegmentData
 from app.worker import ingestion_tasks
 
 
 class Result:
-    def __init__(self, value):
+    def __init__(self, value, rowcount=0):
         self.value = value
+        self.rowcount = rowcount
 
     def scalar_one_or_none(self):
         return self.value
@@ -27,12 +32,18 @@ class Result:
 
 
 class FakeDB:
+    """In-memory stand-in for the worker's session.
+
+    Answers each statement by what it targets rather than by call order, so a new
+    query in the worker cannot silently shift every later answer.
+    """
+
     def __init__(self, job, source, space_id):
         self.job = job
         self.source = source
         self.space_id = space_id
         self.added = []
-        self.execute_count = 0
+        self.deleted_tables = []
 
     async def __aenter__(self):
         return self
@@ -41,14 +52,21 @@ class FakeDB:
         return None
 
     async def execute(self, statement):
-        self.execute_count += 1
-        if self.execute_count == 1:
+        if statement.is_delete:
+            self.deleted_tables.append(statement.table.name)
+            return Result(None)
+        if statement.is_update:
+            # The worker's job claim succeeds only while the job is waiting.
+            return Result(None, rowcount=int(self.job.status in WAITING_JOB_STATUSES))
+
+        entity = statement.column_descriptions[0]["entity"]
+        if entity is IngestionJob:
             return Result(self.job)
-        if self.execute_count == 2:
+        if entity is Source:
             return Result(self.source)
-        if self.execute_count == 3:
+        if entity is SourceSpace:
             return Result(SimpleNamespace(space_id=self.space_id))
-        if self.execute_count == 4:
+        if entity is EmbeddingModel:
             return Result(
                 SimpleNamespace(
                     id=uuid.uuid4(),
@@ -58,7 +76,9 @@ class FakeDB:
                     distance_metric="Cosine",
                 )
             )
-        return Result([value for value in self.added if value.__class__.__name__ == "TranscriptChunk"])
+        if entity is TranscriptChunk:
+            return Result([value for value in self.added if isinstance(value, TranscriptChunk)])
+        raise AssertionError(f"FakeDB got an unexpected statement: {statement}")
 
     def add(self, value):
         if getattr(value, "id", None) is None:
@@ -73,19 +93,6 @@ class FakeDB:
 
     async def refresh(self, value):
         return None
-
-
-@pytest.fixture(autouse=True)
-def reset_calls(monkeypatch: pytest.MonkeyPatch) -> list:
-    """Record reset calls instead of running them. FakeDB answers queries by call
-    order, so the reset's own queries are covered by the integration tests."""
-    calls = []
-
-    async def record_reset(db, source):
-        calls.append(source.id)
-
-    monkeypatch.setattr(ingestion_tasks, "_reset_source_outputs", record_reset)
-    return calls
 
 
 def source_and_job():
@@ -126,7 +133,6 @@ def youtube_source_and_job():
 async def test_ingestion_worker_completes_pipeline_and_cleans_audio(
     monkeypatch: pytest.MonkeyPatch,
     tmp_path: Path,
-    reset_calls: list,
 ) -> None:
     source, job = source_and_job()
     db = FakeDB(job, source, uuid.uuid4())
@@ -179,7 +185,8 @@ async def test_ingestion_worker_completes_pipeline_and_cleans_audio(
 
     await ingestion_tasks.ingest_source({}, str(job.id), str(source.id), str(source.user_id))
 
-    assert reset_calls == [source.id]
+    # The run started by clearing earlier outputs (none existed, so no Qdrant calls).
+    assert db.deleted_tables == ["transcript_chunks", "transcript_segments"]
     assert job.status == "COMPLETED"
     assert source.status == "READY"
     assert source.transcript_status == "TRANSCRIBED"
@@ -286,10 +293,19 @@ async def test_ingestion_worker_reraises_original_error_when_recording_failure_f
     source, job = source_and_job()
     db = FakeDB(job, source, uuid.uuid4())
 
-    async def refresh_fails(value):
-        raise RuntimeError("source was deleted mid-run")
+    rolled_back = []
 
-    db.refresh = refresh_fails
+    async def rollback():
+        rolled_back.append(True)
+
+    async def refresh_fails_after_rollback(value):
+        # Reloading succeeds when the job is claimed, then fails while the worker
+        # records the failure, as if the source was deleted mid-run.
+        if rolled_back:
+            raise RuntimeError("source was deleted mid-run")
+
+    db.rollback = rollback
+    db.refresh = refresh_fails_after_rollback
     monkeypatch.setattr(ingestion_tasks, "AsyncSessionLocal", lambda: db)
 
     async def fail_download(*args, **kwargs):
@@ -299,6 +315,30 @@ async def test_ingestion_worker_reraises_original_error_when_recording_failure_f
 
     with pytest.raises(RuntimeError, match="download failed"):
         await ingestion_tasks.ingest_source({}, str(job.id), str(source.id), str(source.user_id))
+
+
+@pytest.mark.asyncio
+async def test_ingestion_worker_skips_a_job_that_is_no_longer_waiting(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    source, job = source_and_job()
+    job.status = "CANCELLED"
+    db = FakeDB(job, source, uuid.uuid4())
+    downloads = []
+
+    monkeypatch.setattr(ingestion_tasks, "AsyncSessionLocal", lambda: db)
+    monkeypatch.setattr(
+        ingestion_tasks.audio_service,
+        "download_audio",
+        lambda *args: record_async(downloads, args, None),
+    )
+
+    await ingestion_tasks.ingest_source({}, str(job.id), str(source.id), str(source.user_id))
+
+    assert downloads == []
+    assert db.deleted_tables == []
+    assert job.status == "CANCELLED"
+    assert source.status == "PENDING"
 
 
 async def async_value(value):

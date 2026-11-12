@@ -16,14 +16,15 @@ from datetime import datetime, timezone
 
 from fastapi import APIRouter, status
 from fastapi.responses import StreamingResponse
-from sqlalchemy import select
+from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import CurrentUser, DBDep
-from app.core.exceptions import ForbiddenException, NotFoundException
+from app.core.exceptions import ConflictException, ForbiddenException, NotFoundException
 from app.models.ingestion_job import IngestionJob
+from app.models.source import Source
 from app.schemas.jobs import JobOut
-from app.services.job_service import mark_stale_if_needed
+from app.services.job_service import WAITING_JOB_STATUSES, mark_stale_if_needed
 
 router = APIRouter(prefix="/jobs", tags=["jobs"])
 
@@ -263,18 +264,28 @@ async def cancel_job(
     current_user: CurrentUser,
     db: DBDep,
 ) -> JobOut:
-    """Cancel a PENDING or QUEUED job."""
+    """Cancel a job that is still waiting (PENDING or QUEUED)."""
     job = await _get_owned_job(db, job_id, current_user.id)
 
-    if job.status not in ("PENDING", "QUEUED"):
-        from fastapi import HTTPException
-
-        raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT,
-            detail=f"Job is {job.status}. Only PENDING/QUEUED jobs can be cancelled.",
+    # Same guard the worker uses to claim a job, in one atomic UPDATE: if the
+    # worker claimed it first, nothing matches and the cancel is refused.
+    result = await db.execute(
+        update(IngestionJob)
+        .where(IngestionJob.id == job.id, IngestionJob.status.in_(WAITING_JOB_STATUSES))
+        .values(status="CANCELLED", current_step="Cancelled before processing started")
+        .execution_options(synchronize_session=False)
+    )
+    if result.rowcount != 1:
+        await db.rollback()
+        await db.refresh(job)
+        raise ConflictException(
+            f"Job is {job.status}. Only PENDING/QUEUED jobs can be cancelled."
         )
 
-    job.status = "CANCELLED"
+    if job.source_id:
+        await db.execute(
+            update(Source).where(Source.id == job.source_id).values(status="CANCELLED")
+        )
     await db.commit()
     await db.refresh(job)
     return JobOut.model_validate(job)

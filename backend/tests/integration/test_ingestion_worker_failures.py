@@ -8,12 +8,15 @@ A retry must replace whatever the failed attempt left behind.
 import uuid
 from decimal import Decimal
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
+from fastapi import HTTPException
 from qdrant_client.models import FieldCondition, Filter, MatchValue
 from sqlalchemy import delete, func, select, update
 from sqlalchemy.exc import IntegrityError
 
+from app.api.v1.jobs import cancel_job
 from app.db.session import AsyncSessionLocal
 from app.models.embedding_model import EmbeddingModel
 from app.models.ingestion_job import IngestionJob
@@ -219,4 +222,76 @@ async def test_retry_after_late_failure_replaces_earlier_outputs(
         assert await _output_counts(source_id, collection) == (3, expected_chunks, expected_chunks)
     finally:
         await qdrant_service.delete_by_source(collection, source_id)
+        await _delete_user(user_id)
+
+
+async def _cancel_via_api(job_id: uuid.UUID, user_id: uuid.UUID) -> int:
+    """Call the cancel endpoint with its own session and return the HTTP status."""
+    async with AsyncSessionLocal() as db:
+        try:
+            await cancel_job(job_id, SimpleNamespace(id=user_id), db)
+        except HTTPException as exc:
+            return exc.status_code
+        return 200
+
+
+@pytest.mark.asyncio
+async def test_job_cancelled_while_queued_never_runs(monkeypatch: pytest.MonkeyPatch) -> None:
+    user_id, source_id, job_id = await _create_queued_job()
+    collection = (await _active_embedding_model()).qdrant_collection
+    downloads = []
+
+    async def fake_download(source_url, job_uuid):
+        downloads.append(source_url)
+        raise RuntimeError("the worker ran a cancelled job")
+
+    monkeypatch.setattr(ingestion_tasks.audio_service, "download_audio", fake_download)
+
+    try:
+        assert await _cancel_via_api(job_id, user_id) == 200
+
+        await ingestion_tasks.ingest_source({}, str(job_id), str(source_id), str(user_id))
+
+        assert downloads == []
+        async with AsyncSessionLocal() as db:
+            job = await db.get(IngestionJob, job_id)
+            source = await db.get(Source, source_id)
+            assert job.status == "CANCELLED"
+            assert source.status == "CANCELLED"
+        segments, chunks = (await _output_counts(source_id, collection))[:2]
+        assert (segments, chunks) == (0, 0)
+    finally:
+        await _delete_user(user_id)
+
+
+@pytest.mark.asyncio
+async def test_cancel_is_refused_once_the_worker_has_started(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    user_id, source_id, job_id = await _create_queued_job()
+    cancel_statuses = []
+    real_reset = ingestion_tasks._reset_source_outputs
+
+    async def cancel_arrives_then_reset(db, source):
+        # The worker has loaded the job but not written any status of its own yet.
+        cancel_statuses.append(await _cancel_via_api(job_id, user_id))
+        await real_reset(db, source)
+
+    async def stop_run(source_url, job_uuid):
+        raise RuntimeError("stop after the cancel attempt")
+
+    monkeypatch.setattr(ingestion_tasks, "_reset_source_outputs", cancel_arrives_then_reset)
+    monkeypatch.setattr(ingestion_tasks.audio_service, "download_audio", stop_run)
+
+    try:
+        with pytest.raises(RuntimeError, match="stop after the cancel attempt"):
+            await ingestion_tasks.ingest_source({}, str(job_id), str(source_id), str(user_id))
+
+        # The worker had claimed the job, so the cancel must be refused rather
+        # than reported as successful and then silently overwritten.
+        assert cancel_statuses == [409]
+        async with AsyncSessionLocal() as db:
+            job = await db.get(IngestionJob, job_id)
+            assert job.status == "FAILED"
+    finally:
         await _delete_user(user_id)

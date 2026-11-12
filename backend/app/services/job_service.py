@@ -7,6 +7,10 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.config import settings
 from app.models.ingestion_job import IngestionJob
 
+# A job can be claimed by the worker or cancelled only while it is still waiting.
+# Both use this guard in an atomic UPDATE, so whichever commits first wins.
+WAITING_JOB_STATUSES = ("PENDING", "QUEUED")
+
 ACTIVE_JOB_STATUSES = {
     "DOWNLOADING",
     "TRANSCRIBING",

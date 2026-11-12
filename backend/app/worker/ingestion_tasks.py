@@ -14,7 +14,7 @@ import uuid
 from datetime import datetime, timezone
 from pathlib import Path
 
-from sqlalchemy import delete, select
+from sqlalchemy import delete, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import settings
@@ -31,6 +31,7 @@ from app.services import (
     transcription_service,
     youtube_caption_service,
 )
+from app.services.job_service import WAITING_JOB_STATUSES
 
 logger = logging.getLogger(__name__)
 
@@ -66,6 +67,33 @@ async def _update_job(
     if status == "COMPLETED":
         job.completed_at = _now()
     await db.commit()
+
+
+async def _claim_job(db: AsyncSession, job: IngestionJob, *, status: str, stage: str) -> bool:
+    """Atomically move a waiting job into its first running stage.
+
+    The cancel endpoint uses the same guard (status still PENDING or QUEUED), so a
+    job is either cancelled before the worker claims it or claimed before a cancel
+    arrives, never both. Returns False when the job was not waiting, for example
+    because it was cancelled while queued.
+    """
+    now = _now()
+    result = await db.execute(
+        update(IngestionJob)
+        .where(IngestionJob.id == job.id, IngestionJob.status.in_(WAITING_JOB_STATUSES))
+        .values(
+            status=status,
+            stage=stage,
+            progress=1,
+            current_step="Starting…",
+            started_at=now,
+            heartbeat_at=now,
+        )
+        .execution_options(synchronize_session=False)
+    )
+    await db.commit()
+    await db.refresh(job)
+    return result.rowcount == 1
 
 
 async def _reset_source_outputs(db: AsyncSession, source: Source) -> None:
@@ -192,7 +220,16 @@ async def ingest_source(
             )
             return
 
-        job.started_at = _now()
+        uses_captions = youtube_caption_service.is_youtube_url(source.source_url)
+        claimed = await _claim_job(
+            db,
+            job,
+            status="TRANSCRIBING" if uses_captions else "DOWNLOADING",
+            stage="transcription" if uses_captions else "download",
+        )
+        if not claimed:
+            logger.info("Job %s is %s, not waiting to run; skipping it", job_id, job.status)
+            return
 
         try:
             source.status = "PROCESSING"
@@ -202,7 +239,7 @@ async def ingest_source(
             lang = source.language if source.language != "auto" else None
             segments: list[transcription_service.TranscriptSegmentData] = []
 
-            if youtube_caption_service.is_youtube_url(source.source_url):
+            if uses_captions:
                 await _update_job(
                     db,
                     job,
