@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import api from "@/lib/api";
+import api, { refreshAccessToken } from "@/lib/api";
 import { useAuthStore } from "./authStore";
 
 vi.mock("@/lib/api", () => ({
@@ -7,10 +7,12 @@ vi.mock("@/lib/api", () => ({
     post: vi.fn(),
     get: vi.fn(),
   },
+  refreshAccessToken: vi.fn(),
   setSessionExpiredHandler: vi.fn(),
 }));
 
 const mockedApi = vi.mocked(api);
+const mockedRefresh = vi.mocked(refreshAccessToken);
 
 describe("authStore", () => {
   beforeEach(() => {
@@ -51,6 +53,36 @@ describe("authStore", () => {
     expect(useAuthStore.getState()).toMatchObject({
       user,
       isAuthenticated: true,
+      isLoading: false,
+    });
+  });
+
+  it("restores the session on load through the shared refresh", async () => {
+    const user = { id: "user-1", email: "researcher@example.com", name: "Researcher" };
+    mockedRefresh.mockResolvedValueOnce("restored-token");
+    mockedApi.get.mockResolvedValueOnce({ data: user });
+
+    await useAuthStore.getState().initialize();
+
+    expect(mockedRefresh).toHaveBeenCalledOnce();
+    expect(mockedApi.post).not.toHaveBeenCalled();
+    expect(mockedApi.get).toHaveBeenCalledWith("/auth/me");
+    expect(useAuthStore.getState()).toMatchObject({
+      user,
+      isAuthenticated: true,
+      isLoading: false,
+    });
+  });
+
+  it("ends logged out when there is no session to restore", async () => {
+    mockedRefresh.mockRejectedValueOnce(new Error("no refresh cookie"));
+
+    await useAuthStore.getState().initialize();
+
+    expect(mockedApi.get).not.toHaveBeenCalled();
+    expect(useAuthStore.getState()).toMatchObject({
+      user: null,
+      isAuthenticated: false,
       isLoading: false,
     });
   });

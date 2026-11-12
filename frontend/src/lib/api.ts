@@ -33,19 +33,34 @@ export function notifySessionExpired() {
   }
 }
 
-// Track in-flight refresh to avoid duplicate calls
-let isRefreshing = false;
-let refreshQueue: Array<{
-  resolve: (token: string) => void;
-  reject: (err: unknown) => void;
-}> = [];
+// One refresh at a time: concurrent callers share the in-flight request, because
+// each refresh rotates the cookie and a second parallel refresh would be rejected.
+let refreshInFlight: Promise<string> | null = null;
 
-function processQueue(error: unknown, token: string | null = null) {
-  refreshQueue.forEach(({ resolve, reject }) => {
-    if (error) reject(error);
-    else resolve(token!);
-  });
-  refreshQueue = [];
+/**
+ * Exchange the HttpOnly refresh cookie for a new access token.
+ * Used by the axios interceptor and by fetch-based streams (chat), which the
+ * interceptor cannot see. On failure the session is reported expired once.
+ */
+export function refreshAccessToken(): Promise<string> {
+  if (!refreshInFlight) {
+    refreshInFlight = api
+      .post<{ access_token: string }>("/auth/refresh")
+      .then(({ data }) => {
+        if (typeof window !== "undefined") {
+          window.__sourcecast_access_token = data.access_token;
+        }
+        return data.access_token;
+      })
+      .catch((error: unknown) => {
+        notifySessionExpired();
+        throw error;
+      })
+      .finally(() => {
+        refreshInFlight = null;
+      });
+  }
+  return refreshInFlight;
 }
 
 // ── Request interceptor: attach access token ──────────────────────────────────
@@ -72,44 +87,13 @@ api.interceptors.response.use(
       !originalRequest._retry &&
       !originalRequest.url?.includes("/auth/")
     ) {
-      if (isRefreshing) {
-        // Queue request while refresh is in flight
-        return new Promise((resolve, reject) => {
-          refreshQueue.push({
-            resolve: (token) => {
-              if (originalRequest.headers) {
-                originalRequest.headers["Authorization"] = `Bearer ${token}`;
-              }
-              resolve(api(originalRequest));
-            },
-            reject,
-          });
-        });
-      }
-
       originalRequest._retry = true;
-      isRefreshing = true;
-
-      try {
-        const { data } = await api.post<{ access_token: string }>(
-          "/auth/refresh"
-        );
-        const newToken = data.access_token;
-        if (typeof window !== "undefined") {
-          window.__sourcecast_access_token = newToken;
-        }
-        processQueue(null, newToken);
-        if (originalRequest.headers) {
-          originalRequest.headers["Authorization"] = `Bearer ${newToken}`;
-        }
-        return api(originalRequest);
-      } catch (refreshError) {
-        processQueue(refreshError, null);
-        notifySessionExpired();
-        return Promise.reject(refreshError);
-      } finally {
-        isRefreshing = false;
+      // refreshAccessToken reports the expired session itself if it fails.
+      const newToken = await refreshAccessToken();
+      if (originalRequest.headers) {
+        originalRequest.headers["Authorization"] = `Bearer ${newToken}`;
       }
+      return api(originalRequest);
     }
 
     return Promise.reject(error);

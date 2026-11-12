@@ -1,8 +1,8 @@
 "use client";
 
 import { create } from "zustand";
-import api, { setSessionExpiredHandler } from "@/lib/api";
-import { AuthResponse, User, TokenResponse } from "@/lib/types";
+import api, { refreshAccessToken, setSessionExpiredHandler } from "@/lib/api";
+import { AuthResponse, User } from "@/lib/types";
 
 interface AuthState {
   user: User | null;
@@ -29,11 +29,9 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     });
 
     try {
-      // Attempt silent refresh on app load to restore session
-      const { data } = await api.post<TokenResponse>("/auth/refresh");
-      if (typeof window !== "undefined") {
-        window.__sourcecast_access_token = data.access_token;
-      }
+      // Silent refresh on app load to restore the session. It goes through the
+      // shared refresh so it can never race a second refresh with the same cookie.
+      await refreshAccessToken();
       const { data: user } = await api.get<User>("/auth/me");
       set({ user, isAuthenticated: true, isLoading: false });
     } catch {
