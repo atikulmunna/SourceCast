@@ -15,8 +15,9 @@ from app.services.auth_service import AuthService
 
 
 class Result:
-    def __init__(self, value):
+    def __init__(self, value, rowcount=0):
         self.value = value
+        self.rowcount = rowcount
 
     def scalar_one_or_none(self):
         return self.value
@@ -29,12 +30,18 @@ class Result:
 
 
 class FakeDB:
-    def __init__(self, *results):
+    def __init__(self, *results, update_rowcount=1):
         self.results = list(results)
         self.added = []
+        self.updates = []
+        self.update_rowcount = update_rowcount
         self.commits = 0
+        self.rollbacks = 0
 
     async def execute(self, statement):
+        if statement.is_update:
+            self.updates.append(statement.compile().params)
+            return Result(None, rowcount=self.update_rowcount)
         return Result(self.results.pop(0))
 
     def add(self, value):
@@ -42,6 +49,9 @@ class FakeDB:
 
     async def commit(self):
         self.commits += 1
+
+    async def rollback(self):
+        self.rollbacks += 1
 
     async def refresh(self, value):
         if value.id is None:
@@ -126,8 +136,7 @@ async def test_refresh_rotates_matching_token(monkeypatch: pytest.MonkeyPatch) -
         token_hash="old-hash",
         expires_at=datetime.now(timezone.utc) + timedelta(days=1),
     )
-    db = FakeDB([existing_token], existing_user)
-    monkeypatch.setattr(auth_service, "verify_refresh_token", lambda raw, hashed: hashed == "old-hash")
+    db = FakeDB(existing_token, existing_user)
     monkeypatch.setattr(auth_service, "create_access_token", lambda value: "new-access")
     monkeypatch.setattr(auth_service, "generate_refresh_token", lambda: "new-refresh")
     monkeypatch.setattr(auth_service, "hash_refresh_token", lambda value: "new-hash")
@@ -136,28 +145,67 @@ async def test_refresh_rotates_matching_token(monkeypatch: pytest.MonkeyPatch) -
 
     assert access == "new-access"
     assert refresh == "new-refresh"
-    assert existing_token.revoked_at is not None
-    assert existing_token.replaced_by_token_id == db.added[0].id
     assert db.added[0].token_hash == "new-hash"
+    # The old token is revoked by a guarded UPDATE that records its replacement.
+    [revoke] = db.updates
+    assert revoke["id_1"] == existing_token.id
+    assert revoke["revoked_at"] is not None
+    assert revoke["replaced_by_token_id"] == db.added[0].id
+    assert db.commits == 1
 
 
 @pytest.mark.asyncio
-async def test_refresh_rejects_unknown_token(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setattr(auth_service, "verify_refresh_token", lambda raw, hashed: False)
+async def test_refresh_rejects_unknown_token() -> None:
+    with pytest.raises(CredentialsException):
+        await AuthService(FakeDB(None)).refresh("unknown")
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("state", ["revoked", "expired"])
+async def test_refresh_rejects_revoked_or_expired_token(state: str) -> None:
+    now = datetime.now(timezone.utc)
+    token = RefreshToken(
+        id=uuid.uuid4(),
+        user_id=uuid.uuid4(),
+        token_hash="hash",
+        expires_at=now - timedelta(minutes=1) if state == "expired" else now + timedelta(days=1),
+        revoked_at=now if state == "revoked" else None,
+    )
+    db = FakeDB(token)
 
     with pytest.raises(CredentialsException):
-        await AuthService(FakeDB([])).refresh("unknown")
+        await AuthService(db).refresh("raw-token")
+    assert db.updates == []
 
 
 @pytest.mark.asyncio
-async def test_logout_revokes_matching_token(monkeypatch: pytest.MonkeyPatch) -> None:
-    token = SimpleNamespace(token_hash="match", revoked_at=None)
-    monkeypatch.setattr(auth_service, "verify_refresh_token", lambda raw, hashed: hashed == "match")
-    db = FakeDB([token])
+async def test_refresh_rejects_token_used_by_a_concurrent_request() -> None:
+    """Both requests found the token unused; the guarded UPDATE lets only one win."""
+    existing_user = user()
+    token = RefreshToken(
+        id=uuid.uuid4(),
+        user_id=existing_user.id,
+        token_hash="hash",
+        expires_at=datetime.now(timezone.utc) + timedelta(days=1),
+    )
+    db = FakeDB(token, existing_user, update_rowcount=0)
+
+    with pytest.raises(CredentialsException):
+        await AuthService(db).refresh("raw-token")
+    assert db.rollbacks == 1
+    assert db.commits == 0
+
+
+@pytest.mark.asyncio
+async def test_logout_revokes_the_token_with_that_hash(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(auth_service, "hash_refresh_token", lambda value: f"hash-of-{value}")
+    db = FakeDB()
 
     await AuthService(db).logout("raw-token")
 
-    assert token.revoked_at is not None
+    [revoke] = db.updates
+    assert revoke["token_hash_1"] == "hash-of-raw-token"
+    assert revoke["revoked_at"] is not None
     assert db.commits == 1
 
 

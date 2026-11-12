@@ -1,7 +1,7 @@
 import uuid
 from datetime import datetime, timezone
 
-from sqlalchemy import DateTime, ForeignKey, String, Text
+from sqlalchemy import DateTime, ForeignKey, Index, String, Text
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -35,6 +35,9 @@ class RefreshToken(Base):
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False, default=utcnow
     )
+
+    # Refresh and logout look tokens up by hash (migration 006).
+    __table_args__ = (Index("uq_refresh_tokens_token_hash", "token_hash", unique=True),)
 
     # Relationships
     user: Mapped["User"] = relationship("User", back_populates="refresh_tokens")

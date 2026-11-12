@@ -3,7 +3,7 @@ import uuid
 from datetime import datetime, timezone
 
 from fastapi import Request
-from sqlalchemy import select
+from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.exceptions import (
@@ -19,7 +19,6 @@ from app.core.security import (
     hash_refresh_token,
     refresh_token_expiry,
     verify_password,
-    verify_refresh_token,
 )
 from app.models.refresh_token import RefreshToken
 from app.models.user import User
@@ -86,22 +85,14 @@ class AuthService:
         """
         Validate refresh token, rotate it, return (new_access_token, new_raw_refresh_token).
         """
-        # Find all non-expired, non-revoked tokens and check against hash
+        now = datetime.now(timezone.utc)
+        # One indexed lookup by hash. Tokens are 64 random bytes, so the SHA-256
+        # hash reveals nothing and needs no constant-time comparison.
         result = await self.db.execute(
-            select(RefreshToken).where(
-                RefreshToken.revoked_at.is_(None),
-                RefreshToken.expires_at > datetime.now(timezone.utc),
-            )
+            select(RefreshToken).where(RefreshToken.token_hash == hash_refresh_token(raw_token))
         )
-        tokens = result.scalars().all()
-
-        matched: RefreshToken | None = None
-        for token in tokens:
-            if verify_refresh_token(raw_token, token.token_hash):
-                matched = token
-                break
-
-        if not matched:
+        matched = result.scalar_one_or_none()
+        if not matched or matched.revoked_at is not None or matched.expires_at <= now:
             raise CredentialsException("Invalid or expired refresh token")
 
         # Get user
@@ -124,24 +115,34 @@ class AuthService:
         )
         self.db.add(new_rt)
 
-        # Revoke old token and record rotation chain
-        matched.revoked_at = datetime.now(timezone.utc)
-        matched.replaced_by_token_id = new_rt.id
+        # Revoke the old token only if it is still unused, and record the rotation.
+        # Two requests racing with one token both reach this point; the row lock
+        # lets one win and the other match nothing, so a token is never used twice.
+        revoked = await self.db.execute(
+            update(RefreshToken)
+            .where(RefreshToken.id == matched.id, RefreshToken.revoked_at.is_(None))
+            .values(revoked_at=now, replaced_by_token_id=new_rt.id)
+            .execution_options(synchronize_session=False)
+        )
+        if revoked.rowcount != 1:
+            await self.db.rollback()
+            raise CredentialsException("Invalid or expired refresh token")
 
         await self.db.commit()
         return new_access, new_raw_refresh
 
     async def logout(self, raw_token: str) -> None:
         """Revoke a specific refresh token."""
-        result = await self.db.execute(
-            select(RefreshToken).where(RefreshToken.revoked_at.is_(None))
+        await self.db.execute(
+            update(RefreshToken)
+            .where(
+                RefreshToken.token_hash == hash_refresh_token(raw_token),
+                RefreshToken.revoked_at.is_(None),
+            )
+            .values(revoked_at=datetime.now(timezone.utc))
+            .execution_options(synchronize_session=False)
         )
-        tokens = result.scalars().all()
-        for token in tokens:
-            if verify_refresh_token(raw_token, token.token_hash):
-                token.revoked_at = datetime.now(timezone.utc)
-                await self.db.commit()
-                return
+        await self.db.commit()
 
     async def logout_all(self, user_id: uuid.UUID) -> None:
         """Revoke all active refresh tokens for a user."""

@@ -1,6 +1,5 @@
 import secrets
 import hashlib
-import hmac
 from datetime import datetime, timedelta, timezone
 from typing import Any
 
@@ -65,10 +64,6 @@ def generate_refresh_token() -> str:
 def hash_refresh_token(raw_token: str) -> str:
     """Hash a high-entropy refresh token before database storage."""
     return hashlib.sha256(raw_token.encode("utf-8")).hexdigest()
-
-
-def verify_refresh_token(raw_token: str, hashed: str) -> bool:
-    return hmac.compare_digest(hash_refresh_token(raw_token), hashed)
 
 
 def refresh_token_expiry() -> datetime:

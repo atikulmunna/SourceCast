@@ -12,7 +12,6 @@ from app.core.security import (
     hash_password,
     hash_refresh_token,
     verify_password,
-    verify_refresh_token,
 )
 from app.schemas.auth import RegisterRequest
 
@@ -25,13 +24,14 @@ def test_password_hash_round_trip() -> None:
     assert not verify_password("incorrect123", hashed)
 
 
-def test_refresh_token_hash_round_trip() -> None:
+def test_refresh_token_hash_is_stable_and_never_the_raw_token() -> None:
     raw_token = generate_refresh_token()
     hashed = hash_refresh_token(raw_token)
 
     assert raw_token != hashed
-    assert verify_refresh_token(raw_token, hashed)
-    assert not verify_refresh_token("wrong-token", hashed)
+    # Refresh and logout find tokens by hash, so hashing must be deterministic.
+    assert hash_refresh_token(raw_token) == hashed
+    assert hash_refresh_token("wrong-token") != hashed
 
 
 def test_access_token_round_trip() -> None:
