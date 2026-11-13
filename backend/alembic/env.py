@@ -37,8 +37,8 @@ if config.config_file_name is not None:
     fileConfig(config.config_file_name)
 
 # Override URL from settings so alembic.ini hardcoded value is never used in practice.
-# Prefer DIRECT_URL for hosts like Supabase where migrations should use a
-# session-mode connection while runtime uses a transaction pooler.
+# Prefer DIRECT_URL (Neon's non-pooled endpoint) so migrations bypass the
+# transaction pooler that runtime traffic uses.
 config.set_main_option("sqlalchemy.url", settings.migration_database_url)
 
 target_metadata = Base.metadata

@@ -173,3 +173,35 @@ def test_migration_database_url_prefers_direct_url() -> None:
     )
 
     assert settings.migration_database_url == "postgresql+asyncpg://migration/db"
+
+
+def test_database_urls_accept_neon_connection_strings_as_copied() -> None:
+    # Neon prints libpq URLs; asyncpg rejects sslmode and channel_binding.
+    settings = Settings(
+        DATABASE_URL=(
+            "postgresql://app:s%40cret@ep-demo-123-pooler.c-2.us-east-1.aws.neon.tech"
+            "/sourcecast?sslmode=require&channel_binding=require"
+        ),
+        DIRECT_URL=(
+            "postgres://app:s%40cret@ep-demo-123.c-2.us-east-1.aws.neon.tech"
+            "/sourcecast?sslmode=require"
+        ),
+    )
+
+    assert settings.DATABASE_URL == (
+        "postgresql+asyncpg://app:s%40cret@ep-demo-123-pooler.c-2.us-east-1.aws.neon.tech"
+        "/sourcecast?ssl=require"
+    )
+    assert settings.migration_database_url == (
+        "postgresql+asyncpg://app:s%40cret@ep-demo-123.c-2.us-east-1.aws.neon.tech"
+        "/sourcecast?ssl=require"
+    )
+
+
+def test_database_url_normalization_leaves_asyncpg_urls_alone() -> None:
+    url = "postgresql+asyncpg://sourcecast:sourcecast_dev@localhost:5432/sourcecast"
+
+    settings = Settings(DATABASE_URL=url, DIRECT_URL="")
+
+    assert settings.DATABASE_URL == url
+    assert settings.DIRECT_URL == ""

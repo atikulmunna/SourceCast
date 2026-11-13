@@ -1,8 +1,32 @@
 from pydantic_settings import BaseSettings, SettingsConfigDict
 from pydantic import field_validator, model_validator
+from sqlalchemy.engine import make_url
 from typing import Literal
 
 PLACEHOLDER_SECRET_MARKERS = ("change-me", "in-production", "replace-with", "your-")
+
+
+def normalize_database_url(url: str) -> str:
+    """Accept a database URL as Neon (or any libpq tool) prints it.
+
+    asyncpg takes `ssl` where libpq takes `sslmode`, and has no `channel_binding`
+    option, so a pasted `postgresql://...?sslmode=require&channel_binding=require`
+    would otherwise fail on the first connection. URLs already in asyncpg form are
+    returned unchanged.
+    """
+    if not url:
+        return url
+    parsed = make_url(url)
+    query = dict(parsed.query)
+    if "sslmode" in query:
+        query.setdefault("ssl", query.pop("sslmode"))
+    query.pop("channel_binding", None)
+    drivername = parsed.drivername
+    if drivername in ("postgres", "postgresql"):
+        drivername = "postgresql+asyncpg"
+    if drivername == parsed.drivername and query == dict(parsed.query):
+        return url
+    return parsed.set(drivername=drivername, query=query).render_as_string(hide_password=False)
 
 
 class Settings(BaseSettings):
@@ -54,6 +78,11 @@ class Settings(BaseSettings):
     )
     DIRECT_URL: str = ""
 
+    @field_validator("DATABASE_URL", "DIRECT_URL")
+    @classmethod
+    def normalize_database_urls(cls, value: str) -> str:
+        return normalize_database_url(value)
+
     @property
     def migration_database_url(self) -> str:
         return self.DIRECT_URL or self.DATABASE_URL
@@ -73,7 +102,7 @@ class Settings(BaseSettings):
     WORKER_POLL_DELAY_SECONDS: float = 10.0
 
     # ── Storage ───────────────────────────────────────────────────────────────
-    STORAGE_PROVIDER: Literal["local", "supabase", "s3"] = "local"
+    STORAGE_PROVIDER: Literal["local", "s3"] = "local"
     AUDIO_STORAGE_POLICY: Literal[
         "DELETE_AFTER_TRANSCRIPTION", "RETAIN"
     ] = "DELETE_AFTER_TRANSCRIPTION"

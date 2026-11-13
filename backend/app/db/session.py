@@ -1,6 +1,7 @@
 from collections.abc import AsyncGenerator
 import uuid
 
+from sqlalchemy.engine import make_url
 from sqlalchemy.pool import NullPool
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 
@@ -12,11 +13,13 @@ def _prepared_statement_name() -> str:
 
 
 def _uses_transaction_pooler(database_url: str) -> bool:
+    """True for PgBouncer in transaction mode, such as Neon's `-pooler` endpoint."""
     normalized = database_url.lower()
+    host = (make_url(database_url).host or "").lower()
     return (
         "pgbouncer=true" in normalized
         or "prepared_statement_cache_size=0" in normalized
-        or "pooler.supabase.com:6543" in normalized
+        or host.split(".", 1)[0].endswith("-pooler")
     )
 
 
