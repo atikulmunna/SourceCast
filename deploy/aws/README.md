@@ -6,7 +6,7 @@ This deployment runs SourceCast on one always-on EC2 instance:
 - Next.js frontend
 - FastAPI backend
 - ARQ background worker
-- External managed Supabase Postgres, Upstash Redis, Qdrant Cloud, and Groq
+- External managed Neon Postgres, Upstash Redis, Qdrant Cloud, and Groq
 
 The frontend and backend share one origin. Browser calls use `/api/v1/...`, and
 Caddy routes `/api/*` to FastAPI.
@@ -159,7 +159,7 @@ docker compose logs -f caddy
 ## Cost Guardrails
 
 - Use one EC2 instance only for the MVP.
-- Keep Supabase, Upstash, and Qdrant on their existing plans.
+- Keep Neon, Upstash, and Qdrant on their existing plans.
 - Set an AWS Budget alert below your project cap, for example `$25` and `$40`.
 - Stop or terminate the EC2 instance when you no longer need the always-on demo.
 

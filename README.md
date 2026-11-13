@@ -99,7 +99,7 @@ AWS EC2
         +-- FastAPI backend
         +-- ARQ worker
         |
-        +-- Supabase Postgres: app data
+        +-- Neon Postgres: app data
         +-- Upstash Redis: ingestion queue
         +-- Groq Whisper: hosted transcription
         +-- Qdrant Cloud: vector retrieval
@@ -200,6 +200,8 @@ DEBUG=false
 TRANSCRIPTION_PROVIDER=groq
 GROQ_API_KEY=your_groq_key
 EMBEDDING_PROVIDER=hash
+DATABASE_URL=postgresql://...-pooler...neon.tech/sourcecast?sslmode=require
+DIRECT_URL=postgresql://...neon.tech/sourcecast?sslmode=require
 REDIS_URL=rediss://...
 QDRANT_URL=https://your-qdrant-cluster.cloud.qdrant.io
 QDRANT_API_KEY=your_qdrant_key

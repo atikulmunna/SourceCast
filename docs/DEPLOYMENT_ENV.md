@@ -8,8 +8,8 @@ Use this checklist before setting `ENVIRONMENT=production`.
 |---|---|
 | `ENVIRONMENT` | Set to `production`. |
 | `DEBUG` | Set to `false`. |
-| `DATABASE_URL` | Use a managed or private PostgreSQL URL. |
-| `DIRECT_URL` | Optional migration-only database URL; recommended for Supabase session pooler. |
+| `DATABASE_URL` | Use a managed or private PostgreSQL URL; for Neon, the pooled URL. |
+| `DIRECT_URL` | Optional migration-only database URL; for Neon, the direct (non-pooled) URL. |
 | `REDIS_URL` | Use a managed or private Redis URL; use `rediss://` for TLS providers such as Upstash. |
 | `QDRANT_URL` | Use a hosted Qdrant URL or a private service URL. |
 | `JWT_ACCESS_SECRET` | Use a random secret with at least 32 characters. |
@@ -41,26 +41,33 @@ Use this checklist before setting `ENVIRONMENT=production`.
 | `WORKER_MAX_JOBS` | Keep `1` on small/free hosted workers. |
 | `WORKER_POLL_DELAY_SECONDS` | Use `10` or higher on request-metered Redis providers such as Upstash free tier. |
 
-## Supabase Database URLs
+## Neon Database URLs
 
-For Supabase, use the transaction-mode pooler for runtime and the session-mode
-pooler for Alembic migrations:
+The hosted database is Neon Postgres. Neon gives two connection strings for the
+same database: a pooled one (the host ends in `-pooler`; PgBouncer in
+transaction mode) and a direct one. Use the pooled URL for the app and the
+direct URL for Alembic migrations:
 
 ```env
-DATABASE_URL=postgresql+asyncpg://postgres.project-ref:YOUR_URL_ENCODED_PASSWORD@aws-1-region.pooler.supabase.com:6543/postgres?ssl=require&prepared_statement_cache_size=0
-DIRECT_URL=postgresql+asyncpg://postgres.project-ref:YOUR_URL_ENCODED_PASSWORD@aws-1-region.pooler.supabase.com:5432/postgres?ssl=require
+DATABASE_URL=postgresql://USER:PASSWORD@ep-name-123456-pooler.c-2.us-east-1.aws.neon.tech/sourcecast?sslmode=require&channel_binding=require
+DIRECT_URL=postgresql://USER:PASSWORD@ep-name-123456.c-2.us-east-1.aws.neon.tech/sourcecast?sslmode=require&channel_binding=require
 ```
 
-If the password includes reserved URL characters, URL-encode it before placing it
-in either connection string.
+Paste both as the Neon console prints them, or as `neon connection-string`
+prints them (add `--pooled` for `DATABASE_URL`). SourceCast adapts them for
+asyncpg: it switches the driver to `postgresql+asyncpg`, turns `sslmode` into
+`ssl`, and drops `channel_binding`, which asyncpg does not support. If a
+password includes reserved URL characters, URL-encode it.
 
-SourceCast automatically detects the Supabase transaction pooler URL and disables
-asyncpg prepared-statement caching for runtime connections.
+For the pooled URL, SourceCast detects the `-pooler` host, turns off asyncpg's
+prepared-statement cache and opens a fresh connection per session, so nothing
+depends on reaching the same server connection twice.
 
-To reduce the chance of a free Supabase project pausing for inactivity, add a
-GitHub repository secret named `SUPABASE_DATABASE_URL` and set it to the same
-runtime database URL. The weekly `Supabase Keepalive` workflow strips the
-`+asyncpg` driver marker and runs `select 1`.
+On the free plan, Neon suspends the compute after 5 minutes without queries and
+wakes it on the next connection, which adds a few hundred milliseconds to that
+first request. Neon does not pause the project itself, so the database needs no
+keepalive job. Keep the Neon project in the same region as the EC2 instance
+(`aws-us-east-1` by default).
 
 ## Redis URLs
 
