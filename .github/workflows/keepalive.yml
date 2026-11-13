@@ -1,0 +1,83 @@
+name: Managed Services Keepalive
+
+# Free tiers stop idle services: Qdrant Cloud suspends a cluster after 1 week
+# without requests (and deletes it 4 weeks later), and Upstash archives a Redis
+# database after 30 days without activity. A daily request keeps both awake with
+# a wide margin even when GitHub delays or skips a scheduled run.
+#
+# GitHub also disables scheduled workflows in a public repository after 60 days
+# without repository activity. The last job re-enables this workflow on every
+# run, which resets that counter, so the schedule keeps itself alive.
+#
+# Repository secrets: QDRANT_URL, QDRANT_API_KEY, UPSTASH_REDIS_REST_URL and
+# UPSTASH_REDIS_REST_READONLY_TOKEN (the read-only REST token is enough for PING).
+# The Neon database needs no keepalive: Neon suspends idle compute but never
+# pauses the project.
+
+on:
+  schedule:
+    - cron: "23 4 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  qdrant:
+    name: Ping Qdrant cluster
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: List collections
+        env:
+          QDRANT_URL: ${{ secrets.QDRANT_URL }}
+          QDRANT_API_KEY: ${{ secrets.QDRANT_API_KEY }}
+        run: |
+          if [ -z "$QDRANT_URL" ] || [ -z "$QDRANT_API_KEY" ]; then
+            echo "QDRANT_URL or QDRANT_API_KEY secret is missing"
+            exit 1
+          fi
+          curl --fail --show-error --silent --max-time 30 \
+            --retry 3 --retry-all-errors --retry-delay 10 \
+            --header "api-key: ${QDRANT_API_KEY}" \
+            "${QDRANT_URL%/}/collections" > /dev/null
+          echo "Qdrant answered."
+
+  upstash:
+    name: Ping Upstash Redis
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: PING over REST
+        env:
+          UPSTASH_REDIS_REST_URL: ${{ secrets.UPSTASH_REDIS_REST_URL }}
+          UPSTASH_REDIS_REST_TOKEN: ${{ secrets.UPSTASH_REDIS_REST_READONLY_TOKEN }}
+        run: |
+          if [ -z "$UPSTASH_REDIS_REST_URL" ] || [ -z "$UPSTASH_REDIS_REST_TOKEN" ]; then
+            echo "UPSTASH_REDIS_REST_URL or UPSTASH_REDIS_REST_READONLY_TOKEN secret is missing"
+            exit 1
+          fi
+          reply=$(curl --fail --show-error --silent --max-time 30 \
+            --retry 3 --retry-all-errors --retry-delay 10 \
+            --header "Authorization: Bearer ${UPSTASH_REDIS_REST_TOKEN}" \
+            "${UPSTASH_REDIS_REST_URL%/}/ping")
+          if [ "$reply" != '{"result":"PONG"}' ]; then
+            echo "Unexpected reply from Upstash: $reply"
+            exit 1
+          fi
+          echo "Upstash answered PONG."
+
+  stay-enabled:
+    name: Keep this schedule enabled
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      actions: write
+    steps:
+      - name: Re-enable this workflow
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh api --method PUT \
+            "repos/${GITHUB_REPOSITORY}/actions/workflows/keepalive.yml/enable"
+          echo "Workflow re-enabled; the 60-day inactivity counter is reset."
