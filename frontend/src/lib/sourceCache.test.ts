@@ -1,6 +1,6 @@
 import { QueryClient } from "@tanstack/react-query";
 import { describe, expect, it } from "vitest";
-import { syncDeletedSource } from "./sourceCache";
+import { syncDeletedSource, sourceListRefetchInterval } from "./sourceCache";
 import { Source } from "./types";
 
 function source(id: string, title: string): Source {
@@ -43,5 +43,23 @@ describe("syncDeletedSource", () => {
     ]);
     expect(queryClient.getQueryData(["sources", "source-1"])).toBeUndefined();
     expect(queryClient.getQueryData(["transcript", "source-1", 1])).toBeUndefined();
+  });
+});
+
+describe("sourceListRefetchInterval", () => {
+  const withStatuses = (...statuses: string[]) => statuses.map((status) => ({ status }));
+
+  it("keeps polling while any source is still being ingested", () => {
+    expect(sourceListRefetchInterval(withStatuses("READY", "PROCESSING"))).toBe(3000);
+    expect(sourceListRefetchInterval(withStatuses("PENDING"))).toBe(3000);
+  });
+
+  it("stops polling once every source is settled", () => {
+    expect(sourceListRefetchInterval(withStatuses("READY", "FAILED", "CANCELLED"))).toBe(false);
+  });
+
+  it("does not poll an empty or not yet loaded list", () => {
+    expect(sourceListRefetchInterval([])).toBe(false);
+    expect(sourceListRefetchInterval(undefined)).toBe(false);
   });
 });

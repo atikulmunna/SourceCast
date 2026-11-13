@@ -6,6 +6,7 @@ import Link from "next/link";
 import { useState } from "react";
 import { Clock, FileText, Layers, Plus, Radio, Search } from "lucide-react";
 import api from "@/lib/api";
+import { sourceListRefetchInterval } from "@/lib/sourceCache";
 import { KnowledgeSpace, Source, SourceIngestResponse } from "@/lib/types";
 import { SourcePreviewModal } from "@/components/sources/SourcePreviewModal";
 import { JobProgressPanel } from "@/components/jobs/JobProgressPanel";
@@ -40,6 +41,7 @@ export default function SpaceDetailPage() {
       return data;
     },
     enabled: Boolean(spaceId),
+    refetchInterval: (query) => sourceListRefetchInterval(query.state.data),
   });
 
   const handleIngested = (result: SourceIngestResponse) => {
