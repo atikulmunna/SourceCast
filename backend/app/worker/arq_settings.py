@@ -11,7 +11,12 @@ Or directly:
 from arq.connections import RedisSettings
 
 from app.core.config import settings
+from app.services.openrouter_client import close_openrouter_client
 from app.worker.ingestion_tasks import ingest_source
+
+
+async def _shutdown(ctx: dict) -> None:
+    await close_openrouter_client()
 
 
 class WorkerSettings:
@@ -37,4 +42,4 @@ class WorkerSettings:
     max_tries = 1  # IngestionJob.max_retries handles retry logic in DB
 
     on_startup = None
-    on_shutdown = None
+    on_shutdown = _shutdown

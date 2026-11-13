@@ -6,13 +6,13 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app.api.v1 import auth, briefs, chat, compare, insights, jobs, qa, sources, spaces
 from app.core.config import settings
+from app.services.openrouter_client import close_openrouter_client
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
-    # Startup: could initialize DB connection pool, etc.
     yield
-    # Shutdown: cleanup tasks would go here.
+    await close_openrouter_client()
 
 
 def create_app() -> FastAPI:

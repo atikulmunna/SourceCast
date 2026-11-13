@@ -119,9 +119,23 @@ def test_production_accepts_strong_jwt_secrets() -> None:
         JWT_ACCESS_SECRET="access-secret-with-more-than-32-characters",
         JWT_REFRESH_SECRET="refresh-secret-with-more-than-32-characters",
         REDIS_URL="redis://localhost:6379/0",
+        OPENROUTER_API_KEY="sk-or-v1-test-key",
     )
 
     assert settings.ENVIRONMENT == "production"
+
+
+@pytest.mark.parametrize("key", ["", "your_openrouter_key"])
+def test_production_requires_a_real_openrouter_key(key: str) -> None:
+    with pytest.raises(ValidationError, match="OPENROUTER_API_KEY"):
+        Settings(
+            ENVIRONMENT="production",
+            DEBUG=False,
+            JWT_ACCESS_SECRET="access-secret-with-more-than-32-characters",
+            JWT_REFRESH_SECRET="refresh-secret-with-more-than-32-characters",
+            REDIS_URL="redis://localhost:6379/0",
+            OPENROUTER_API_KEY=key,
+        )
 
 
 def test_production_rejects_non_tls_upstash_redis_url() -> None:
@@ -142,6 +156,7 @@ def test_production_accepts_tls_upstash_redis_url() -> None:
         JWT_ACCESS_SECRET="access-secret-with-more-than-32-characters",
         JWT_REFRESH_SECRET="refresh-secret-with-more-than-32-characters",
         REDIS_URL="rediss://default:secret@wealthy-shad-74894.upstash.io:6379",
+        OPENROUTER_API_KEY="sk-or-v1-test-key",
     )
 
     assert settings.REDIS_URL.startswith("rediss://")
