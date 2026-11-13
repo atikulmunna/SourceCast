@@ -1,0 +1,35 @@
+[
+  {"id": "e01", "source": "economic-machine", "start": 35, "end": 76, "question": "What are the three main forces that drive the economy according to Dalio?"},
+  {"id": "e02", "source": "economic-machine", "start": 430, "end": 470, "question": "How long does the long-term debt cycle last?"},
+  {"id": "e03", "source": "economic-machine", "start": 590, "end": 620, "question": "How much credit is there in the United States compared to money?"},
+  {"id": "e04", "source": "economic-machine", "start": 745, "end": 775, "question": "What does the central bank do when it sees inflation rising?"},
+  {"id": "e05", "source": "economic-machine", "start": 1150, "end": 1190, "question": "What are the four ways debt burdens can come down in a deleveraging?"},
+  {"id": "e06", "source": "economic-machine", "start": 1075, "end": 1115, "question": "Why doesn't lowering interest rates fix a deleveraging?"},
+  {"id": "e07", "source": "economic-machine", "start": 1590, "end": 1625, "question": "What makes a deleveraging beautiful?"},
+  {"id": "e08", "source": "economic-machine", "start": 1790, "end": 1846, "question": "What are Dalio's three rules of thumb?"},
+
+  {"id": "s01", "source": "schools-creativity", "start": 225, "end": 260, "question": "What did the girl in the drawing lesson say when the teacher said nobody knows what God looks like?"},
+  {"id": "s02", "source": "schools-creativity", "start": 300, "end": 340, "question": "What did the third boy say in the Nativity play?"},
+  {"id": "s03", "source": "schools-creativity", "start": 515, "end": 550, "question": "Which subjects sit at the top and the bottom of every education system's hierarchy?"},
+  {"id": "s04", "source": "schools-creativity", "start": 585, "end": 615, "question": "What does Robinson say the purpose of public education seems to be?"},
+  {"id": "s05", "source": "schools-creativity", "start": 815, "end": 845, "question": "How does Robinson define creativity?"},
+  {"id": "s06", "source": "schools-creativity", "start": 990, "end": 1025, "question": "What did the doctor tell Gillian Lynne's mother?"},
+  {"id": "s07", "source": "schools-creativity", "start": 675, "end": 700, "question": "Why were public education systems created in the first place?"},
+
+  {"id": "k01", "source": "llm-intro", "start": 100, "end": 135, "question": "How big is the Llama 2 70B parameters file, and why that size?"},
+  {"id": "k02", "source": "llm-intro", "start": 140, "end": 175, "question": "How many lines of code does it take to run the Llama 2 model?"},
+  {"id": "k03", "source": "llm-intro", "start": 295, "end": 330, "question": "How many GPUs and how many days did it take to train Llama 2 70B, and what did it cost?"},
+  {"id": "k04", "source": "llm-intro", "start": 755, "end": 800, "question": "What is the reversal curse?"},
+  {"id": "k05", "source": "llm-intro", "start": 1240, "end": 1360, "question": "What kind of labels does the third stage of fine-tuning use?"},
+  {"id": "k06", "source": "llm-intro", "start": 1424, "end": 1475, "question": "How does Chatbot Arena rank language models?"},
+  {"id": "k07", "source": "llm-intro", "start": 1545, "end": 1580, "question": "What two variables do scaling laws depend on?"},
+  {"id": "k08", "source": "llm-intro", "start": 2350, "end": 2380, "question": "How long did AlphaGo take to beat the best human players through self-improvement?"},
+  {"id": "k09", "source": "llm-intro", "start": 2640, "end": 2680, "question": "What part of a computer does Karpathy compare the context window to?"},
+  {"id": "k10", "source": "llm-intro", "start": 3440, "end": 3480, "question": "What trigger phrase was used in the data poisoning attack?"},
+
+  {"id": "u01", "question": "What does Ray Dalio say about Bitcoin during a deleveraging?"},
+  {"id": "u02", "question": "Which university did Ken Robinson work at as a professor?"},
+  {"id": "u03", "question": "How many parameters does GPT-4 have?"},
+  {"id": "u04", "question": "What learning rate does Karpathy recommend for fine-tuning?"},
+  {"id": "u05", "question": "What did Dalio say about the 2020 pandemic stimulus?"}
+]

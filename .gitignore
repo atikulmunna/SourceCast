@@ -61,3 +61,7 @@ Thumbs.db
 .idea/
 .vscode/
 desktop.ini
+
+# Eval: third-party transcript fixtures and run results stay local
+backend/evals/fixtures/
+backend/evals/results/
