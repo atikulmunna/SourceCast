@@ -24,6 +24,9 @@ class EvidenceHit(BaseModel):
     score: float
     confidence_label: str
     navigation_url: str | None = None
+    # The whole chunk, for the model's prompt. Never serialized: API responses
+    # and stored evidence keep the short excerpt.
+    text: str | None = Field(default=None, exclude=True)
 
 
 class AskQuestionResponse(BaseModel):

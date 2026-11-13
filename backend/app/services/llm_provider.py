@@ -1,86 +1,80 @@
+"""Chat answers through OpenRouter.
+
+By default chat uses the Auto Router (`CHAT_MODEL=openrouter/auto`), which picks
+a model per request within the cost tier and the allowed-model shortlist. An
+optional per-token price cap rejects anything more expensive. A fixed model
+slug in `CHAT_MODEL` skips the router.
+"""
+
 from __future__ import annotations
 
-from typing import Protocol
-
-import httpx
+from typing import Any, Protocol
 
 from app.core.config import settings
 from app.core.exceptions import UpstreamServiceException
-from app.schemas.qa import EvidenceHit
+from app.services.openrouter_client import OpenRouterClient, get_openrouter_client
+
+AUTO_ROUTER = "openrouter/auto"
 
 
 class AnswerProvider(Protocol):
-    async def generate(
-        self,
-        messages: list[dict[str, str]],
-        evidence: list[EvidenceHit],
-    ) -> str: ...
+    async def generate(self, messages: list[dict[str, str]]) -> str: ...
 
 
-class ExtractiveAnswerProvider:
-    """Deterministic local provider for development and offline verification."""
-
-    async def generate(
-        self,
-        messages: list[dict[str, str]],
-        evidence: list[EvidenceHit],
-    ) -> str:
-        lead = evidence[0]
-        title = lead.source_title or "the selected source"
-        return (
-            f"The strongest available transcript evidence is from {title} "
-            f"at {lead.start_time_sec}s-{lead.end_time_sec}s. "
-            "Review the cited evidence card for the source wording. [E1]"
-        )
-
-
-class GroqAnswerProvider:
+class OpenRouterAnswerProvider:
     def __init__(
         self,
-        api_key: str,
+        *,
         model: str,
-        base_url: str,
-        timeout_seconds: int,
+        cost_tier: str = "medium",
+        allowed_models: list[str] | None = None,
+        max_prompt_price: float = 0.0,
+        max_completion_price: float = 0.0,
+        client: OpenRouterClient | None = None,
     ) -> None:
-        if not api_key:
-            raise UpstreamServiceException("GROQ_API_KEY is required when LLM_PROVIDER=groq")
-        self.api_key = api_key
         self.model = model
-        self.base_url = base_url.rstrip("/")
-        self.timeout_seconds = timeout_seconds
+        self.cost_tier = cost_tier
+        self.allowed_models = allowed_models or []
+        self.max_prompt_price = max_prompt_price
+        self.max_completion_price = max_completion_price
+        self._client = client
 
-    async def generate(
-        self,
-        messages: list[dict[str, str]],
-        evidence: list[EvidenceHit],
-    ) -> str:
+    def payload(self, messages: list[dict[str, str]]) -> dict[str, Any]:
+        body: dict[str, Any] = {"model": self.model, "messages": messages, "temperature": 0}
+        if self.model == AUTO_ROUTER:
+            plugin: dict[str, Any] = {"id": "auto-router", "cost_tier": self.cost_tier}
+            if self.allowed_models:
+                plugin["allowed_models"] = self.allowed_models
+            body["plugins"] = [plugin]
+        max_price = {
+            key: value
+            for key, value in (
+                ("prompt", self.max_prompt_price),
+                ("completion", self.max_completion_price),
+            )
+            if value > 0
+        }
+        if max_price:
+            body["provider"] = {"max_price": max_price}
+        return body
+
+    async def generate(self, messages: list[dict[str, str]]) -> str:
+        client = self._client or get_openrouter_client()
+        result = await client.chat_completion(self.payload(messages))
         try:
-            async with httpx.AsyncClient(timeout=self.timeout_seconds) as client:
-                response = await client.post(
-                    f"{self.base_url}/chat/completions",
-                    headers={"Authorization": f"Bearer {self.api_key}"},
-                    json={
-                        "model": self.model,
-                        "messages": messages,
-                        "temperature": 0,
-                    },
-                )
-                response.raise_for_status()
-                content = response.json()["choices"][0]["message"]["content"]
-        except (httpx.HTTPError, KeyError, IndexError, TypeError) as exc:
-            raise UpstreamServiceException("Grounded answer provider failed") from exc
-
+            content = result.body["choices"][0]["message"]["content"]
+        except (KeyError, IndexError, TypeError) as exc:
+            raise UpstreamServiceException("OpenRouter chat failed: the response had no answer") from exc
         if not isinstance(content, str) or not content.strip():
-            raise UpstreamServiceException("Grounded answer provider returned an empty answer")
+            raise UpstreamServiceException("OpenRouter chat failed: the model returned an empty answer")
         return content.strip()
 
 
 def get_answer_provider() -> AnswerProvider:
-    if settings.LLM_PROVIDER == "groq":
-        return GroqAnswerProvider(
-            api_key=settings.GROQ_API_KEY,
-            model=settings.LLM_MODEL,
-            base_url=settings.GROQ_BASE_URL,
-            timeout_seconds=settings.LLM_TIMEOUT_SECONDS,
-        )
-    return ExtractiveAnswerProvider()
+    return OpenRouterAnswerProvider(
+        model=settings.CHAT_MODEL,
+        cost_tier=settings.CHAT_COST_TIER,
+        allowed_models=settings.chat_allowed_models,
+        max_prompt_price=settings.CHAT_MAX_PROMPT_PRICE,
+        max_completion_price=settings.CHAT_MAX_COMPLETION_PRICE,
+    )

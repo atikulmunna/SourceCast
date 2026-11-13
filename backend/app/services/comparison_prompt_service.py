@@ -29,7 +29,7 @@ def build_comparison_messages(
             evidence_lines.append(
                 f"[E{evidence_index}] Timestamp: {item.start_time_sec}s-{item.end_time_sec}s\n"
                 f"Confidence: {item.confidence_label}\n"
-                f"Excerpt: {item.excerpt}"
+                f"Transcript: {item.text or item.excerpt}"
             )
             evidence_index += 1
 

@@ -27,8 +27,8 @@ class Provider:
     def __init__(self):
         self.calls = []
 
-    async def generate(self, messages, evidence):
-        self.calls.append((messages, evidence))
+    async def generate(self, messages):
+        self.calls.append(messages)
         return "Grounded provider answer. [E1]"
 
 
@@ -70,7 +70,20 @@ async def test_answer_builds_short_evidence_and_delegates_provider() -> None:
     assert len(response.evidence[0].excerpt) <= 500
     assert response.evidence[0].confidence_label == "High"
     assert retrieval.calls[0]["score_threshold"] == 0.25
-    assert "[E1] Source: Interview" in provider.calls[0][0][1]["content"]
+    assert "[E1] Source: Interview" in provider.calls[0][1]["content"]
+
+
+@pytest.mark.asyncio
+async def test_answer_prompts_with_the_whole_chunk_not_the_display_excerpt() -> None:
+    text = "Setup. " * 120 + "The key figure is fifty trillion dollars."
+    provider = Provider()
+    service = GroundedAnswerService(uuid.uuid4(), retrieval=Retrieval([hit(text)]), provider=provider)
+
+    response = await service.answer("What is the key figure?")
+
+    assert "fifty trillion dollars" in provider.calls[0][1]["content"]
+    assert "fifty trillion" not in response.evidence[0].excerpt
+    assert "text" not in response.model_dump()["evidence"][0]
 
 
 def test_confidence_labels_and_excerpt_normalization() -> None:

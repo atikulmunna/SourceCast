@@ -8,7 +8,6 @@ from app.services.comparison_service import (
     ComparisonSource,
     NO_COMPARISON_EVIDENCE,
 )
-from app.services.llm_provider import ExtractiveAnswerProvider
 from app.services.retrieval_service import RetrievalResult
 
 
@@ -26,12 +25,14 @@ class Provider:
     def __init__(self):
         self.calls = []
 
-    async def generate(self, messages, evidence):
-        self.calls.append((messages, evidence))
+    async def generate(self, messages):
+        self.calls.append(messages)
         return "Comparison answer with citations. [E1]"
 
 
-def hit(source_id: uuid.UUID, title: str = "Interview") -> RetrievalResult:
+def hit(
+    source_id: uuid.UUID, title: str = "Interview", text: str = "Evidence text."
+) -> RetrievalResult:
     return RetrievalResult(
         chunk_id=uuid.uuid4(),
         source_id=source_id,
@@ -39,7 +40,7 @@ def hit(source_id: uuid.UUID, title: str = "Interview") -> RetrievalResult:
         score=0.82,
         start_time_sec=Decimal("10"),
         end_time_sec=Decimal("20"),
-        text="Evidence text.",
+        text=text,
         source_title=title,
     )
 
@@ -68,7 +69,9 @@ async def test_compare_retrieves_each_source_and_marks_missing_evidence() -> Non
     assert response.sources[0].evidence[0].confidence_label == "High"
     assert response.sources[1].insufficient_evidence is True
     assert response.insufficient_source_ids == [second_id]
-    assert provider.calls[0][1] == response.sources[0].evidence
+    prompt = provider.calls[0][1]["content"]
+    assert "Evidence text." in prompt
+    assert "Evidence: insufficient for this topic." in prompt
 
 
 @pytest.mark.asyncio
@@ -86,22 +89,18 @@ async def test_compare_refuses_and_skips_provider_without_any_evidence() -> None
 
 
 @pytest.mark.asyncio
-async def test_compare_builds_honest_grouped_answer_in_local_extractive_mode() -> None:
-    first_id = uuid.uuid4()
-    second_id = uuid.uuid4()
+async def test_compare_prompts_with_whole_chunks_but_returns_short_excerpts() -> None:
+    source_id = uuid.uuid4()
+    long_text = "Opening context. " * 40 + "The decisive claim is at the end."
+    provider = Provider()
 
     response = await ComparisonService(
         uuid.uuid4(),
-        retrieval=Retrieval({first_id: [hit(first_id)]}),
-        provider=ExtractiveAnswerProvider(),
-    ).compare(
-        "Sleep quality",
-        [
-            ComparisonSource(first_id, "First interview"),
-            ComparisonSource(second_id, "Second interview"),
-        ],
-    )
+        retrieval=Retrieval({source_id: [hit(source_id, text=long_text)]}),
+        provider=provider,
+    ).compare("Sleep quality", [ComparisonSource(source_id, "Interview")])
 
-    assert "First interview: review the cited transcript evidence [E1]." in response.answer
-    assert "Second interview: insufficient evidence" in response.answer
-    assert "No supported agreement or difference is asserted" in response.answer
+    assert "The decisive claim is at the end." in provider.calls[0][1]["content"]
+    evidence = response.sources[0].evidence[0]
+    assert evidence.excerpt.endswith("...")
+    assert "text" not in response.model_dump()["sources"][0]["evidence"][0]

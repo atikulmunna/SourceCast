@@ -119,11 +119,15 @@ class Settings(BaseSettings):
     OPENROUTER_TIMEOUT_SECONDS: float = 60.0
     OPENROUTER_MAX_RETRIES: int = 3
     # Chat uses the Auto Router; it picks a model per request within these limits.
+    # Defaults chosen with the eval (2026-11-13): on full-chunk prompts these two
+    # models cite correctly on 96% of answerable questions and refuse all
+    # unanswerable ones, at about $0.0003 per answer. `medium` scored the same at
+    # about 6x the cost; claude-haiku-5.5 hedged too often (72%).
     CHAT_MODEL: str = "openrouter/auto"
-    CHAT_ALLOWED_MODELS: str = ""  # comma-separated patterns, e.g. "openai/gpt-5-mini,google/*"
-    CHAT_COST_TIER: Literal["low", "medium", "high"] = "medium"
-    CHAT_MAX_PROMPT_PRICE: float = 0.0  # USD per million tokens; 0 means no cap
-    CHAT_MAX_COMPLETION_PRICE: float = 0.0  # USD per million tokens; 0 means no cap
+    CHAT_ALLOWED_MODELS: str = "openai/gpt-6-luna,deepseek/deepseek-v4.1-flash*"
+    CHAT_COST_TIER: Literal["low", "medium", "high"] = "low"
+    CHAT_MAX_PROMPT_PRICE: float = 0.5  # USD per million tokens; 0 means no cap
+    CHAT_MAX_COMPLETION_PRICE: float = 2.0  # USD per million tokens; 0 means no cap
     # Fixed models: every vector in an index must come from the same model.
     EMBEDDING_MODEL: str = "openai/text-embedding-3-small"
     TRANSCRIPTION_MODEL: str = "openai/whisper-large-v3"
@@ -135,9 +139,6 @@ class Settings(BaseSettings):
     # ── AI / RAG ──────────────────────────────────────────────────────────────
     GROQ_API_KEY: str = ""
     GROQ_BASE_URL: str = "https://api.groq.com/openai/v1"
-    LLM_PROVIDER: Literal["extractive", "groq"] = "extractive"
-    LLM_MODEL: str = "llama-3.1-8b-instant"
-    LLM_TIMEOUT_SECONDS: int = 30
     TRANSCRIPTION_PROVIDER: Literal["local", "groq"] = "local"
     GROQ_TRANSCRIPTION_MODEL: str = "whisper-large-v3-turbo"
     TRANSCRIPTION_TIMEOUT_SECONDS: int = 300

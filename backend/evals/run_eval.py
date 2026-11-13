@@ -3,7 +3,7 @@
     cd backend
     python -m evals.run_eval --fetch-only
     python -m evals.run_eval --embedding-models openai/text-embedding-3-small
-    python -m evals.run_eval --chat auto:medium --chat model:openai/gpt-5-mini
+    python -m evals.run_eval --chat settings --chat auto:low --chat model:openai/gpt-6-luna
 
 Fixtures are the caption transcripts of the talks in sources.json, fetched once
 through the app's YouTube caption path and cached in evals/fixtures/ (gitignored:
@@ -36,6 +36,11 @@ from app.core.config import settings
 from app.schemas.qa import EvidenceHit
 from app.services.chunking_service import create_chunks
 from app.services.grounded_answer_service import confidence_label, excerpt
+from app.services.llm_provider import (
+    AUTO_ROUTER,
+    OpenRouterAnswerProvider,
+    get_answer_provider,
+)
 from app.services.openrouter_client import OpenRouterClient, get_openrouter_client
 from app.services.prompt_service import build_grounded_answer_messages
 from app.services.transcription_service import TranscriptSegmentData
@@ -209,21 +214,22 @@ def retrieval_report(index: Index, questions: list[Question], cost: float) -> di
 # ── Answers ───────────────────────────────────────────────────────────────────
 
 
-def chat_payload(config: str, messages: list[dict[str, str]]) -> dict[str, Any]:
-    """`auto:<tier>[:<pattern>|<pattern>]` for the Auto Router, or `model:<slug>`."""
+def chat_provider(config: str) -> OpenRouterAnswerProvider:
+    """`settings` (the configured production chat), `auto:<tier>[:<pattern>|<pattern>]`
+    for the Auto Router, or `model:<slug>`."""
+    if config == "settings":
+        return get_answer_provider()
     kind, _, rest = config.partition(":")
-    payload: dict[str, Any] = {"messages": messages, "temperature": 0}
     if kind == "model":
-        payload["model"] = rest
-        return payload
+        return OpenRouterAnswerProvider(model=rest)
     if kind != "auto":
         raise ValueError(f"Unknown chat config {config!r}")
     tier, _, patterns = rest.partition(":")
-    plugin: dict[str, Any] = {"id": "auto-router", "cost_tier": tier or "medium"}
-    if patterns:
-        plugin["allowed_models"] = patterns.split("|")
-    payload.update(model="openrouter/auto", plugins=[plugin])
-    return payload
+    return OpenRouterAnswerProvider(
+        model=AUTO_ROUTER,
+        cost_tier=tier or "medium",
+        allowed_models=patterns.split("|") if patterns else None,
+    )
 
 
 async def answer_report(
@@ -233,9 +239,10 @@ async def answer_report(
     questions: list[Question],
     *,
     threshold: float,
-    full_text: bool,
+    excerpt_only: bool,
     spend: Spend,
 ) -> tuple[dict[str, Any], list[dict[str, Any]]]:
+    provider = chat_provider(config)
     rows: list[dict[str, Any]] = []
     for q in questions:
         hits = [(c, s) for c, s in index.ranked(q.id)[:ANSWER_LIMIT] if s >= threshold]
@@ -247,9 +254,10 @@ async def answer_report(
                 source_title=chunk.title,
                 start_time_sec=Decimal(str(chunk.span.start)),
                 end_time_sec=Decimal(str(chunk.span.end)),
-                excerpt=chunk.text if full_text else excerpt(chunk.text),
+                excerpt=excerpt(chunk.text),
                 score=round(score, 4),
                 confidence_label=confidence_label(score),
+                text=None if excerpt_only else chunk.text,
             )
             for chunk, score in hits
         ]
@@ -260,7 +268,7 @@ async def answer_report(
         else:
             started = time.monotonic()
             result = await client.chat_completion(
-                chat_payload(config, build_grounded_answer_messages(q.question, evidence))
+                provider.payload(build_grounded_answer_messages(q.question, evidence))
             )
             spend.add(f"chat {config}", result.cost)
             answer = result.body["choices"][0]["message"].get("content") or ""
@@ -293,7 +301,7 @@ async def answer_report(
         models[r["model"]] = models.get(r["model"], 0) + 1
     summary = {
         "config": config,
-        "evidence": "full chunk" if full_text else "500-char excerpt",
+        "evidence": "500-char excerpt" if excerpt_only else "full chunk",
         "answered_with_valid_citations": sum(r["correct"] for r in answerable) / len(answerable),
         "cites_expected_moment": sum(r["grounded"] for r in answerable) / len(answerable),
         "correct_refusals": (
@@ -378,7 +386,9 @@ async def main() -> None:
         help="comma-separated; the first one is used for answers",
     )
     parser.add_argument("--chat", action="append", default=[], help="chat config, repeatable")
-    parser.add_argument("--full-text", action="store_true", help="send whole chunks, not excerpts")
+    parser.add_argument(
+        "--excerpt-only", action="store_true", help="send 500-char excerpts (the old prompt)"
+    )
     parser.add_argument("--threshold", type=float, default=0.25, help="answer score threshold")
     parser.add_argument("--max-spend", type=float, default=0.50, help="abort above this many USD")
     args = parser.parse_args()
@@ -409,7 +419,7 @@ async def main() -> None:
                     indexes[0],
                     questions,
                     threshold=args.threshold,
-                    full_text=args.full_text,
+                    excerpt_only=args.excerpt_only,
                     spend=spend,
                 )
             )

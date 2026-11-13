@@ -1,147 +1,126 @@
-import uuid
-from decimal import Decimal
+import json
 
+import httpx
 import pytest
 
 from app.core.exceptions import UpstreamServiceException
-from app.schemas.qa import EvidenceHit
 from app.services import llm_provider
-from app.services.llm_provider import ExtractiveAnswerProvider, GroqAnswerProvider
+from app.services.llm_provider import OpenRouterAnswerProvider
+from app.services.openrouter_client import OpenRouterClient
+
+MESSAGES = [{"role": "user", "content": "Question"}]
 
 
-def evidence() -> EvidenceHit:
-    return EvidenceHit(
-        chunk_id=uuid.uuid4(),
-        source_id=uuid.uuid4(),
-        space_id=None,
-        source_title="Interview",
-        start_time_sec=Decimal("12.5"),
-        end_time_sec=Decimal("18.0"),
-        excerpt="Timestamped transcript evidence.",
-        score=0.91,
-        confidence_label="High",
+def client_returning(*responses: httpx.Response) -> tuple[OpenRouterClient, list[httpx.Request]]:
+    queue = list(responses)
+    requests: list[httpx.Request] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        requests.append(request)
+        return queue.pop(0)
+
+    async def no_sleep(_: float) -> None:
+        return None
+
+    client = OpenRouterClient(
+        api_key="sk-or-test",
+        base_url="https://openrouter.test/api/v1",
+        timeout_seconds=5,
+        transport=httpx.MockTransport(handler),
+        sleep=no_sleep,
+    )
+    return client, requests
+
+
+def answer(content) -> httpx.Response:
+    return httpx.Response(
+        200,
+        json={
+            "model": "openai/gpt-6-luna",
+            "choices": [{"message": {"role": "assistant", "content": content}}],
+            "usage": {"cost": 0.0004},
+        },
     )
 
 
-@pytest.mark.asyncio
-async def test_extractive_provider_returns_cited_pointer_without_repeating_excerpt() -> None:
-    item = evidence()
+def test_auto_router_payload_carries_tier_shortlist_and_price_cap() -> None:
+    provider = OpenRouterAnswerProvider(
+        model="openrouter/auto",
+        cost_tier="low",
+        allowed_models=["openai/gpt-6-luna", "anthropic/*"],
+        max_prompt_price=0.5,
+        max_completion_price=2.0,
+    )
 
-    answer = await ExtractiveAnswerProvider().generate([], [item])
+    payload = provider.payload(MESSAGES)
 
-    assert "[E1]" in answer
-    assert "Interview" in answer
-    assert item.excerpt not in answer
-
-
-def test_groq_provider_requires_api_key() -> None:
-    with pytest.raises(UpstreamServiceException, match="GROQ_API_KEY"):
-        GroqAnswerProvider("", "model", "https://example.com", 10)
-
-
-@pytest.mark.asyncio
-async def test_groq_provider_posts_openai_compatible_request(monkeypatch: pytest.MonkeyPatch) -> None:
-    captured = {}
-
-    class Response:
-        def raise_for_status(self):
-            return None
-
-        def json(self):
-            return {"choices": [{"message": {"content": " Grounded answer [E1] "}}]}
-
-    class Client:
-        def __init__(self, timeout):
-            captured["timeout"] = timeout
-
-        async def __aenter__(self):
-            return self
-
-        async def __aexit__(self, exc_type, exc, tb):
-            return None
-
-        async def post(self, url, headers, json):
-            captured.update(url=url, headers=headers, json=json)
-            return Response()
-
-    monkeypatch.setattr(llm_provider.httpx, "AsyncClient", Client)
-    provider = GroqAnswerProvider("secret", "model", "https://example.com/", 12)
-
-    answer = await provider.generate([{"role": "user", "content": "Question"}], [evidence()])
-
-    assert answer == "Grounded answer [E1]"
-    assert captured["url"] == "https://example.com/chat/completions"
-    assert captured["headers"]["Authorization"] == "Bearer secret"
-    assert captured["json"]["temperature"] == 0
+    assert payload == {
+        "model": "openrouter/auto",
+        "messages": MESSAGES,
+        "temperature": 0,
+        "plugins": [
+            {
+                "id": "auto-router",
+                "cost_tier": "low",
+                "allowed_models": ["openai/gpt-6-luna", "anthropic/*"],
+            }
+        ],
+        "provider": {"max_price": {"prompt": 0.5, "completion": 2.0}},
+    }
 
 
-@pytest.mark.asyncio
-async def test_groq_provider_wraps_malformed_response(monkeypatch: pytest.MonkeyPatch) -> None:
-    class Response:
-        def raise_for_status(self):
-            return None
+def test_fixed_model_payload_has_no_router_plugin_or_unset_caps() -> None:
+    payload = OpenRouterAnswerProvider(model="openai/gpt-6-luna").payload(MESSAGES)
 
-        def json(self):
-            return {}
-
-    class Client:
-        def __init__(self, timeout):
-            pass
-
-        async def __aenter__(self):
-            return self
-
-        async def __aexit__(self, exc_type, exc, tb):
-            return None
-
-        async def post(self, *args, **kwargs):
-            return Response()
-
-    monkeypatch.setattr(llm_provider.httpx, "AsyncClient", Client)
-
-    with pytest.raises(UpstreamServiceException, match="provider failed"):
-        await GroqAnswerProvider("secret", "model", "https://example.com", 12).generate([], [evidence()])
+    assert payload == {"model": "openai/gpt-6-luna", "messages": MESSAGES, "temperature": 0}
 
 
-def test_provider_factory_defaults_to_extractive(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setattr(llm_provider.settings, "LLM_PROVIDER", "extractive")
+async def test_generate_returns_the_trimmed_answer() -> None:
+    client, requests = client_returning(answer("  Grounded answer. [E1]  "))
+    provider = OpenRouterAnswerProvider(model="openrouter/auto", client=client)
 
-    assert isinstance(llm_provider.get_answer_provider(), ExtractiveAnswerProvider)
+    result = await provider.generate(MESSAGES)
 
-
-def test_provider_factory_builds_configured_groq_provider(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setattr(llm_provider.settings, "LLM_PROVIDER", "groq")
-    monkeypatch.setattr(llm_provider.settings, "GROQ_API_KEY", "secret")
-    monkeypatch.setattr(llm_provider.settings, "LLM_MODEL", "model")
-    monkeypatch.setattr(llm_provider.settings, "GROQ_BASE_URL", "https://example.com")
-    monkeypatch.setattr(llm_provider.settings, "LLM_TIMEOUT_SECONDS", 12)
-
-    assert isinstance(llm_provider.get_answer_provider(), GroqAnswerProvider)
+    assert result == "Grounded answer. [E1]"
+    assert json.loads(requests[0].content)["plugins"][0]["id"] == "auto-router"
 
 
-@pytest.mark.asyncio
-async def test_groq_provider_rejects_empty_answer(monkeypatch: pytest.MonkeyPatch) -> None:
-    class Response:
-        def raise_for_status(self):
-            return None
-
-        def json(self):
-            return {"choices": [{"message": {"content": "  "}}]}
-
-    class Client:
-        def __init__(self, timeout):
-            pass
-
-        async def __aenter__(self):
-            return self
-
-        async def __aexit__(self, exc_type, exc, tb):
-            return None
-
-        async def post(self, *args, **kwargs):
-            return Response()
-
-    monkeypatch.setattr(llm_provider.httpx, "AsyncClient", Client)
+@pytest.mark.parametrize("content", ["", "   ", None])
+async def test_generate_rejects_an_empty_answer(content) -> None:
+    client, _ = client_returning(answer(content))
 
     with pytest.raises(UpstreamServiceException, match="empty answer"):
-        await GroqAnswerProvider("secret", "model", "https://example.com", 12).generate([], [evidence()])
+        await OpenRouterAnswerProvider(model="openrouter/auto", client=client).generate(MESSAGES)
+
+
+async def test_generate_rejects_a_response_without_choices() -> None:
+    client, _ = client_returning(httpx.Response(200, json={"model": "x", "choices": []}))
+
+    with pytest.raises(UpstreamServiceException, match="no answer"):
+        await OpenRouterAnswerProvider(model="openrouter/auto", client=client).generate(MESSAGES)
+
+
+def test_factory_builds_the_provider_from_settings(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(llm_provider.settings, "CHAT_MODEL", "openrouter/auto")
+    monkeypatch.setattr(llm_provider.settings, "CHAT_COST_TIER", "low")
+    monkeypatch.setattr(llm_provider.settings, "CHAT_ALLOWED_MODELS", "openai/gpt-6-luna, anthropic/*")
+    monkeypatch.setattr(llm_provider.settings, "CHAT_MAX_PROMPT_PRICE", 0.5)
+    monkeypatch.setattr(llm_provider.settings, "CHAT_MAX_COMPLETION_PRICE", 0.0)
+
+    provider = llm_provider.get_answer_provider()
+
+    assert isinstance(provider, OpenRouterAnswerProvider)
+    payload = provider.payload(MESSAGES)
+    assert payload["plugins"][0] == {
+        "id": "auto-router",
+        "cost_tier": "low",
+        "allowed_models": ["openai/gpt-6-luna", "anthropic/*"],
+    }
+    assert payload["provider"] == {"max_price": {"prompt": 0.5}}
+
+
+async def test_building_the_provider_needs_no_key_until_it_is_called() -> None:
+    provider = llm_provider.get_answer_provider()
+
+    with pytest.raises(UpstreamServiceException, match="OPENROUTER_API_KEY is not configured"):
+        await provider.generate(MESSAGES)

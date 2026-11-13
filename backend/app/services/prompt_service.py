@@ -24,7 +24,7 @@ def build_grounded_answer_messages(
             f"[E{index}] Source: {title}\n"
             f"Timestamp: {item.start_time_sec}s-{item.end_time_sec}s\n"
             f"Confidence: {item.confidence_label}\n"
-            f"Excerpt: {item.excerpt}"
+            f"Transcript: {item.text or item.excerpt}"
         )
 
     user_prompt = (

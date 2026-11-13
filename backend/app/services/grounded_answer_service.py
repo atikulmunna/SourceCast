@@ -72,6 +72,7 @@ class GroundedAnswerService:
                 excerpt=excerpt(hit.text),
                 score=round(hit.score, 4),
                 confidence_label=confidence_label(hit.score),
+                text=hit.text,
             )
             for hit in hits
         ]
@@ -83,5 +84,5 @@ class GroundedAnswerService:
             )
 
         messages = build_grounded_answer_messages(question, evidence)
-        answer = await self.provider.generate(messages, evidence)
+        answer = await self.provider.generate(messages)
         return AskQuestionResponse(answer=answer, evidence=evidence)

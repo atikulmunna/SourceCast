@@ -49,6 +49,8 @@ def test_citations_must_exist_and_be_present() -> None:
         "The excerpts do **not** explicitly enumerate the three forces.",
         "The transcript doesn't give a single duration.",
         "The evidence does not identify which university.",
+        "The transcript evidence does not answer this question.",
+        "None of the excerpts mention Bitcoin.",
     ],
 )
 def test_refusals_are_detected(answer: str) -> None:

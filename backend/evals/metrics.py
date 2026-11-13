@@ -12,12 +12,13 @@ _BRACKET_RE = re.compile(r"\[([^\]]*)\]")
 _EVIDENCE_ID_RE = re.compile(r"\bE(\d+)\b")
 _VERBS = (
     "say|mention|provide|contain|discuss|address|cover|specify|include|give|identify|"
-    "state|list|explain|describe|define|enumerate|tie|name"
+    "state|list|explain|describe|define|enumerate|tie|name|answer"
 )
 _REFUSAL_RE = re.compile(
     r"insufficient|not enough (?:evidence|information|support)|could not find|"
     rf"(?:does|do|did)(?: not|n't)(?: \w+ly)? (?:{_VERBS})|"
     r"no (?:evidence|information|mention)|"
+    r"none of the (?:\w+ ){0,3}(?:mention|discuss|address|cover|contain|define|explain)|"
     r"(?:cannot|can't|can not|unable to) (?:find|answer|determine|confirm|say)|"
     r"not (?:mentioned|discussed|covered|addressed|stated|specified)",
     re.IGNORECASE,
