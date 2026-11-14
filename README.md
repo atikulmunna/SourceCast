@@ -30,7 +30,9 @@ can inspect the supporting passage and return to the source.
 - Chunk, embed, and index source text in Qdrant for retrieval.
 - Ask source-scoped or workspace-scoped questions.
 - Return answers with cited evidence cards, confidence labels, and timestamp
-  links.
+  links, or say plainly that the sources do not answer the question.
+- Run every model call (answers, transcription, embeddings) through one
+  OpenRouter key, with each model chosen on a small evaluation set.
 - Manage private accounts, knowledge spaces, saved chats, comparisons, saved
   insights, and Markdown research briefs.
 - Run production as a single AWS EC2 Docker Compose deployment with Caddy,
@@ -101,8 +103,8 @@ AWS EC2
         |
         +-- Neon Postgres: app data
         +-- Upstash Redis: ingestion queue
-        +-- Groq Whisper: hosted transcription
         +-- Qdrant Cloud: vector retrieval
+        +-- OpenRouter: answers, transcription, embeddings
 ```
 
 | Layer | Technology |
@@ -113,8 +115,9 @@ AWS EC2
 | Worker | ARQ background jobs |
 | Database | PostgreSQL |
 | Queue | Redis |
-| Transcription | Groq Whisper in production, optional faster-whisper locally |
-| Embeddings | Hash embeddings for the hosted MVP, optional sentence-transformers locally |
+| Answers | OpenRouter Auto Router, low cost tier, limited to two measured models |
+| Transcription | OpenRouter `whisper-large-v3-turbo`, audio split into 10-minute chunks with ffmpeg |
+| Embeddings | OpenRouter `voyage-4-lite` (1024 dimensions) |
 | Retrieval | Qdrant |
 | Deployment | AWS EC2, Docker Compose, Caddy, Let's Encrypt |
 
@@ -163,11 +166,9 @@ alembic upgrade head
 uvicorn app.main:app --reload --port 8000
 ```
 
-Local Whisper and sentence-transformer embeddings are optional:
-
-```powershell
-pip install -e ".[dev,local-ml]"
-```
+Put an OpenRouter key in `backend/.env` (`OPENROUTER_API_KEY=...`). Answers,
+transcription and embeddings all need it; the tests do not. Use a separate key
+with a low credit limit for local work.
 
 Start the worker in another terminal:
 
@@ -197,9 +198,7 @@ For the hosted MVP, configure the backend and worker with:
 ```env
 ENVIRONMENT=production
 DEBUG=false
-TRANSCRIPTION_PROVIDER=groq
-GROQ_API_KEY=your_groq_key
-EMBEDDING_PROVIDER=hash
+OPENROUTER_API_KEY=your_openrouter_key
 DATABASE_URL=postgresql://...-pooler...neon.tech/sourcecast?sslmode=require
 DIRECT_URL=postgresql://...neon.tech/sourcecast?sslmode=require
 REDIS_URL=rediss://...
@@ -214,7 +213,24 @@ NEXT_PUBLIC_API_URL=
 ```
 
 This makes the frontend call `/api/v1/...` on the same HTTPS origin instead of
-calling a separate backend URL.
+calling a separate backend URL. The [Environment Guide](docs/DEPLOYMENT_ENV.md)
+lists every setting and the model defaults.
+
+## Evaluation
+
+`backend/evals` measures retrieval and answers on three public talks (an hour
+on large language models, half an hour on economics, twenty minutes on
+education) with 25 questions tied to a timestamp and 5 the talks cannot answer.
+It spends credits, so it runs by hand:
+
+```powershell
+cd backend
+python -m evals.run_eval --chat settings
+```
+
+With the current defaults, all 25 answerable questions get an answer citing the
+right moment, all 5 unanswerable ones are refused, and an answer costs about
+$0.0004. The transcripts are cached locally and not committed.
 
 ## Verification
 

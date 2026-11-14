@@ -6,7 +6,7 @@ This deployment runs SourceCast on one always-on EC2 instance:
 - Next.js frontend
 - FastAPI backend
 - ARQ background worker
-- External managed Neon Postgres, Upstash Redis, Qdrant Cloud, and Groq
+- External managed Neon Postgres, Upstash Redis, Qdrant Cloud, and OpenRouter
 
 The frontend and backend share one origin. Browser calls use `/api/v1/...`, and
 Caddy routes `/api/*` to FastAPI.
@@ -17,8 +17,8 @@ Start with `t4g.small` in a low-cost region such as `us-east-1`:
 
 - 2 vCPU
 - 2 GiB RAM
-- Enough for the hosted MVP because transcription and vector storage are
-  offloaded to Groq and Qdrant Cloud.
+- Enough for the hosted MVP because model calls and vector storage are
+  offloaded to OpenRouter and Qdrant Cloud.
 
 Use Ubuntu 24.04 ARM64. Allocate 10 GB gp3 EBS for the portfolio demo path.
 This is enough for the Dockerized MVP, but leaves limited headroom for build
@@ -89,6 +89,20 @@ NEXT_PUBLIC_API_URL=
 
 Keep `NEXT_PUBLIC_API_URL` empty for AWS. That makes the frontend call the API on
 the same origin through Caddy.
+
+The managed services go in the same file. The backend refuses to start in
+production without `OPENROUTER_API_KEY`:
+
+```env
+DATABASE_URL=<Neon pooled URL, pasted as Neon prints it>
+DIRECT_URL=<Neon direct URL>
+REDIS_URL=rediss://default:<password>@<host>.upstash.io:6379
+QDRANT_URL=https://<cluster>.cloud.qdrant.io
+QDRANT_API_KEY=<Qdrant key>
+OPENROUTER_API_KEY=<a key used only by this server>
+```
+
+See the [Environment Guide](../../docs/DEPLOYMENT_ENV.md) for every setting.
 
 ## Start
 

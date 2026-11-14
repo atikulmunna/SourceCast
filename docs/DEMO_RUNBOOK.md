@@ -40,10 +40,11 @@ Before starting the demo flow, verify the running stack:
 - Register a demo user with an email you can recognize.
 - Create a space named `MVP Demo`.
 - Add one short YouTube or direct-audio URL first.
-- Wait for the job stream to show completion.
-- Add a second short source before testing comparison.
+- Wait for the progress bar to show completion.
+- Add a second source before testing comparison.
 
-Shorter sources are better for a live demo because local Whisper runs on CPU.
+YouTube sources with captions are ready in seconds. Other audio is transcribed
+through OpenRouter at about a minute per hour of audio.
 
 ## 3. Demo Flow
 
@@ -58,20 +59,12 @@ Shorter sources are better for a live demo because local Whisper runs on CPU.
 9. Generate a Markdown research brief.
 10. Preview and download the `.md` export.
 
-## 4. Expected Local-Mode Behavior
+## 4. Model Calls
 
-With `LLM_PROVIDER=extractive`, answers are intentionally conservative. The
-demo should emphasize timestamp evidence, saved research workflow, and Markdown
-export rather than polished prose.
-
-For a more natural answer style, set:
-
-```env
-LLM_PROVIDER=groq
-GROQ_API_KEY=your_key_here
-```
-
-Then restart the backend before demoing generated answers.
+Answers, transcription and embeddings go through OpenRouter, so
+`backend/.env` needs `OPENROUTER_API_KEY`. Questions the sources cannot answer
+return the "could not find enough support" message instead of a guess; that is
+worth showing in the demo too.
 
 ## 5. Quick Recovery
 

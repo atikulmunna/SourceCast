@@ -12,6 +12,7 @@ Use this checklist before setting `ENVIRONMENT=production`.
 | `DIRECT_URL` | Optional migration-only database URL; for Neon, the direct (non-pooled) URL. |
 | `REDIS_URL` | Use a managed or private Redis URL; use `rediss://` for TLS providers such as Upstash. |
 | `QDRANT_URL` | Use a hosted Qdrant URL or a private service URL. |
+| `OPENROUTER_API_KEY` | A real OpenRouter key; production refuses to start without one. Server side only, never in a `NEXT_PUBLIC_*` variable. |
 | `JWT_ACCESS_SECRET` | Use a random secret with at least 32 characters. |
 | `JWT_REFRESH_SECRET` | Use a different random secret with at least 32 characters. |
 | `FRONTEND_URL` | Use the deployed frontend origin, for example `https://app.example.com`. |
@@ -21,15 +22,17 @@ Use this checklist before setting `ENVIRONMENT=production`.
 | Variable | When needed |
 |---|---|
 | `QDRANT_API_KEY` | Required only for hosted Qdrant instances that enforce API keys. |
-| `GROQ_API_KEY` | Required only when `LLM_PROVIDER=groq`. |
-| `GROQ_BASE_URL` | Keep the default unless Groq changes the API base URL. |
-| `LLM_PROVIDER` | Keep `extractive` for no external LLM key, or use `groq` for hosted generation. |
-| `LLM_MODEL` | Set to the hosted model name when using `groq`. |
-| `TRANSCRIPTION_PROVIDER` | Use `local` for local faster-whisper or `groq` for hosted transcription. |
-| `GROQ_TRANSCRIPTION_MODEL` | Use `whisper-large-v3-turbo` for fast hosted transcription, or `whisper-large-v3` for higher accuracy. |
-| `TRANSCRIPTION_TIMEOUT_SECONDS` | HTTP timeout for hosted transcription requests. |
-| `EMBEDDING_PROVIDER` | Use `hash` on small hosted workers, or `sentence-transformers` when the worker can load MiniLM. |
-| `WHISPER_MODEL` | Use `tiny` for small CPU workers; larger models need more memory, CPU, or GPU capacity. |
+| `OPENROUTER_BASE_URL` | Keep the default (`https://openrouter.ai/api/v1`). |
+| `OPENROUTER_TIMEOUT_SECONDS` | Timeout for chat and embedding requests. Default `60`. |
+| `OPENROUTER_MAX_RETRIES` | Retries for rate limits and transient upstream errors. Default `3`. |
+| `CHAT_MODEL` | `openrouter/auto` (the Auto Router) or a fixed model slug. |
+| `CHAT_ALLOWED_MODELS` | Comma-separated models the Auto Router may pick; wildcards such as `deepseek/deepseek-v4.1-flash*` work. |
+| `CHAT_COST_TIER` | Auto Router policy: `low`, `medium` or `high`. Default `low`. |
+| `CHAT_MAX_PROMPT_PRICE`, `CHAT_MAX_COMPLETION_PRICE` | Price cap in USD per million tokens; `0` means no cap. |
+| `EMBEDDING_MODEL`, `EMBEDDING_DIMENSIONS` | Embedding model and its vector size. Changing either starts a new collection (see below). |
+| `TRANSCRIPTION_MODEL` | Whisper model that returns `verbose_json` segments. |
+| `TRANSCRIPTION_CHUNK_MINUTES` | Audio chunk length for transcription. Default `10`. |
+| `TRANSCRIPTION_TIMEOUT_SECONDS` | Timeout per audio chunk. Default `120`. |
 | `YOUTUBE_TRANSCRIPT_LANGUAGES` | Comma-separated YouTube caption language preference order. Defaults to `en,en-US,en-GB`. |
 | `YTDLP_COOKIES_FILE` | Optional path to a Netscape-format YouTube cookies file mounted into the backend container. |
 | `YTDLP_PROXY_URL` | Optional proxy URL for yt-dlp metadata/audio requests. |
@@ -89,35 +92,51 @@ WORKER_MAX_JOBS=1
 WORKER_POLL_DELAY_SECONDS=10
 ```
 
-## Whisper Model Size
+## OpenRouter
 
-Local Whisper support is optional. Install `.[local-ml]` before using
-`TRANSCRIPTION_PROVIDER=local`.
+SourceCast makes every AI call through OpenRouter with one key. Use a dedicated
+key with a credit limit set in the OpenRouter dashboard, and a separate key for
+local development so spend shows per environment.
 
-For low-memory CPU workers, keep:
+| Job | Default | Why | Cost |
+|---|---|---|---|
+| Answers and comparisons | Auto Router (`openrouter/auto`), `low` tier, limited to `openai/gpt-6-luna` and `deepseek/deepseek-v4.1-flash*` | Matched the `medium` tier on the eval at about a sixth of the cost | about $0.0004 per answer |
+| Transcription | `openai/whisper-large-v3-turbo` | Same timestamp accuracy as `whisper-large-v3` on a one-hour talk, for less than half the price | about $0.012 per hour of audio |
+| Embeddings | `mongodb/voyage-4-lite`, 1024 dimensions | Found the expected moment in the top 5 for every eval question | about $0.02 per million tokens |
 
-```env
-WHISPER_MODEL=tiny
+Prices and models change; run the eval in `backend/evals` before switching one.
+
+Before transcription, audio is converted to 16 kHz mono and split into
+10-minute chunks, which keeps every request under OpenRouter's 25 MB upload cap
+and 60-second upstream timeout. The worker needs ffmpeg; the backend image
+includes it.
+
+`CHAT_MAX_PROMPT_PRICE` and `CHAT_MAX_COMPLETION_PRICE` reject any model priced
+above the cap. If no allowed model fits, a question fails with "no allowed model
+is available".
+
+### Changing the embedding model
+
+The Qdrant collection is named after the embedding model and its dimensions, for
+example `source_chunks_voyage_4_lite_1024`. Changing `EMBEDDING_MODEL` or
+`EMBEDDING_DIMENSIONS` starts a new, empty collection, so existing sources stop
+appearing in search until they are re-ingested. Afterwards, remove the old
+collections (the first command only lists them):
+
+```sh
+docker compose exec backend python -m app.cli.prune_vector_collections
+docker compose exec backend python -m app.cli.prune_vector_collections --apply
 ```
 
-If the worker downloads `faster-whisper-base` and then restarts without a Python
-traceback, the process was likely killed while loading the model. Use hosted
-Groq transcription or upgrade the instance before using `base` or larger models.
+## Keeping the Free Tiers Awake
 
-## Hosted Transcription
-
-Small CPU workers may also restart while loading `faster-whisper-tiny`. In that
-case, offload transcription to Groq on both the web service and the background
-worker:
-
-```env
-TRANSCRIPTION_PROVIDER=groq
-GROQ_API_KEY=your-groq-api-key
-GROQ_TRANSCRIPTION_MODEL=whisper-large-v3-turbo
-TRANSCRIPTION_TIMEOUT_SECONDS=300
-```
-
-When `TRANSCRIPTION_PROVIDER=groq`, `WHISPER_MODEL` is ignored for ingestion.
+Qdrant Cloud suspends a free cluster after a week without requests, and Upstash
+archives a free Redis database after 30 days without activity. The `Managed
+Services Keepalive` workflow (`.github/workflows/keepalive.yml`) pings both every
+day and re-enables itself, so GitHub's 60-day inactivity rule cannot switch it
+off. It needs these repository secrets: `QDRANT_URL`, `QDRANT_API_KEY`,
+`UPSTASH_REDIS_REST_URL` and `UPSTASH_REDIS_REST_READONLY_TOKEN`. Neon needs no
+keepalive.
 
 ## YouTube Sources
 
@@ -163,23 +182,6 @@ YTDLP_PROXY_URL=http://user:password@host:port
 The transcript proxy is used before audio download. `YTDLP_PROXY_URL` is only
 needed when you also want yt-dlp metadata or audio fallback traffic to use the
 same proxy.
-
-## Hosted Worker Embeddings
-
-Small CPU workers can also restart while loading the local
-`sentence-transformers/all-MiniLM-L6-v2` embedding model. For the MVP demo path,
-use deterministic hash embeddings instead:
-
-```env
-EMBEDDING_PROVIDER=hash
-DEFAULT_EMBEDDING_MODEL=all-MiniLM-L6-v2
-DEFAULT_QDRANT_COLLECTION=source_chunks_v1_minilm_384
-```
-
-Hash embeddings keep Qdrant indexing and retrieval working without loading a
-local ML model. Use `EMBEDDING_PROVIDER=sentence-transformers` again when the
-backend runs on a worker with enough memory for MiniLM and the `.[local-ml]`
-extra is installed.
 
 ## Required Frontend Values
 
