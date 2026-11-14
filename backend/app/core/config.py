@@ -131,6 +131,9 @@ class Settings(BaseSettings):
     # Fixed models: every vector in an index must come from the same model.
     EMBEDDING_MODEL: str = "openai/text-embedding-3-small"
     TRANSCRIPTION_MODEL: str = "openai/whisper-large-v3"
+    # Audio is split into chunks this long so each upload stays under OpenRouter's
+    # 25 MB cap and 60 second upstream timeout (16 kHz mono, 32 kbit/s: ~2.4 MB).
+    TRANSCRIPTION_CHUNK_MINUTES: int = 10
 
     @property
     def chat_allowed_models(self) -> list[str]:
