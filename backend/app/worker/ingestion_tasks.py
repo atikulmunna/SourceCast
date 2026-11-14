@@ -32,6 +32,7 @@ from app.models.source_space import SourceSpace
 from app.models.transcript_chunk import TranscriptChunk
 from app.models.transcript_segment import TranscriptSegment
 from app.services import (
+    audio_prep_service,
     audio_service,
     chunking_service,
     embedding_service,
@@ -62,6 +63,10 @@ class _Run:
     user_id: uuid.UUID
     # Set as soon as audio is downloaded, so a later failure can still delete it.
     audio_path: Path | None = None
+
+
+TRANSCRIBE_PROGRESS_START = 15
+TRANSCRIBE_PROGRESS_END = 60
 
 
 # ── Job bookkeeping ────────────────────────────────────────────────────────────
@@ -275,35 +280,46 @@ async def _download_audio(run: _Run) -> None:
 
 
 async def _transcribe_audio(run: _Run, language: str | None) -> list[TranscriptSegmentData]:
+    """Split the audio into chunks and transcribe them one by one.
+
+    Progress is reported between chunks, and each chunk runs under its own
+    heartbeat, so the job session is never used by two coroutines at once.
+    """
     await _update_job(
         run.db,
         run.job,
         status="TRANSCRIBING",
         stage="transcription",
-        progress=15,
-        current_step=(
-            "Submitting audio to hosted transcription…"
-            if settings.TRANSCRIPTION_PROVIDER == "groq"
-            else "Loading Whisper model…"
-        ),
+        progress=TRANSCRIBE_PROGRESS_START,
+        current_step="Preparing audio…",
     )
-
-    def on_progress(pct: int, msg: str) -> None:
-        """Called from the transcription thread; heartbeat keeps the job alive."""
-        logger.debug("Transcription progress %d%%: %s", pct, msg)
-
-    segments = await _with_heartbeat(
+    chunks = await _with_heartbeat(
         run,
-        transcription_service.transcribe(
-            run.audio_path,
-            model_size=settings.WHISPER_MODEL,
-            language=language,
-            progress_callback=on_progress,
-        ),
+        audio_prep_service.prepare_audio(run.audio_path, settings.TRANSCRIPTION_CHUNK_MINUTES),
     )
+    segments: list[TranscriptSegmentData] = []
+    try:
+        for chunk in chunks:
+            span = TRANSCRIBE_PROGRESS_END - TRANSCRIBE_PROGRESS_START
+            await _update_job(
+                run.db,
+                run.job,
+                status="TRANSCRIBING",
+                stage="transcription",
+                progress=TRANSCRIBE_PROGRESS_START + span * chunk.index // len(chunks),
+                current_step=f"Transcribing part {chunk.index + 1} of {len(chunks)}…",
+            )
+            segments.extend(
+                await _with_heartbeat(run, transcription_service.transcribe_chunk(chunk, language))
+            )
+    finally:
+        await audio_prep_service.delete_chunks(run.audio_path)
+
+    if not segments:
+        raise RuntimeError("Transcription found no speech in the audio")
     run.source.transcript_status = "TRANSCRIBED"
     await run.db.commit()
-    return segments
+    return transcription_service.renumber(segments)
 
 
 async def _save_segments(run: _Run, segments: list[TranscriptSegmentData]) -> None:

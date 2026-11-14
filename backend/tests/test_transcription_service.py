@@ -1,136 +1,90 @@
 from decimal import Decimal
 from pathlib import Path
-from types import SimpleNamespace
 
+import httpx
 import pytest
 
 from app.services import transcription_service
+from app.services.audio_prep_service import AudioChunk
+from app.services.openrouter_client import OpenRouterClient
+from app.services.transcription_service import (
+    TranscriptSegmentData,
+    map_segments,
+    renumber,
+    transcribe_chunk,
+)
+
+VERBOSE = {
+    "text": "Hello there. General Kenobi.",
+    "duration": 9.5,
+    "segments": [
+        {"start": 0.0, "end": 4.2, "text": " Hello there. ", "avg_logprob": -0.25},
+        {"start": 4.2, "end": 9.5, "text": "General Kenobi."},
+        {"start": 9.5, "end": 9.5, "text": "   "},
+    ],
+}
 
 
-class FakeModel:
-    def transcribe(self, path: str, **kwargs):
-        segments = [
-            SimpleNamespace(start=0.0, end=4.2, text=" first segment ", avg_logprob=-0.2),
-            SimpleNamespace(start=4.2, end=9.0, text="second segment", avg_logprob=-2.0),
-        ]
-        info = SimpleNamespace(language="en", language_probability=0.98, duration=9.0)
-        return iter(segments), info
+def test_segments_are_shifted_by_the_chunk_offset() -> None:
+    segments = map_segments(VERBOSE, offset_sec=600.0)
+
+    assert [(s.start_time_sec, s.end_time_sec, s.text) for s in segments] == [
+        (Decimal("600.0"), Decimal("604.2"), "Hello there."),
+        (Decimal("604.2"), Decimal("609.5"), "General Kenobi."),
+    ]
+    assert segments[0].confidence_score == Decimal("0.75")
+    assert segments[1].confidence_score is None
 
 
-def test_transcribe_sync_maps_timestamped_segments(monkeypatch) -> None:
-    progress = []
-    monkeypatch.setattr(transcription_service, "_load_model", lambda model_size: FakeModel())
+def test_text_without_segments_becomes_one_segment_over_the_chunk() -> None:
+    segments = map_segments({"text": " Only text. ", "duration": 12.0}, offset_sec=1200.0)
 
-    segments = transcription_service.transcribe_sync(
-        audio_path=Path("sample.mp3"),
-        progress_callback=lambda pct, message: progress.append((pct, message)),
-    )
-
-    assert len(segments) == 2
-    assert segments[0].text == "first segment"
-    assert segments[0].confidence_score == Decimal("0.8")
-    assert segments[1].confidence_score == Decimal("0.0")
-    assert progress[0][0] == 46
+    assert [(s.start_time_sec, s.end_time_sec, s.text) for s in segments] == [
+        (Decimal("1200.0"), Decimal("1212.0"), "Only text.")
+    ]
 
 
-@pytest.mark.asyncio
-async def test_transcribe_with_groq_maps_timestamped_segments(
-    monkeypatch, tmp_path: Path
+def test_silence_maps_to_no_segments() -> None:
+    assert map_segments({"text": "", "segments": []}, offset_sec=0.0) == []
+
+
+def test_renumber_makes_indexes_continuous_across_chunks() -> None:
+    first = map_segments(VERBOSE, offset_sec=0.0)
+    second = map_segments(VERBOSE, offset_sec=600.0)
+
+    merged = renumber(first + second)
+
+    assert [s.segment_index for s in merged] == [0, 1, 2, 3]
+    assert [float(s.start_time_sec) for s in merged] == [0.0, 4.2, 600.0, 604.2]
+    assert isinstance(merged[0], TranscriptSegmentData)
+
+
+@pytest.mark.parametrize(("language", "sent"), [("en", "en"), ("auto", None), (None, None)])
+async def test_transcribe_chunk_uploads_the_chunk_and_offsets_the_result(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, language, sent
 ) -> None:
-    audio_path = tmp_path / "sample.mp3"
-    audio_path.write_bytes(b"fake audio")
-    captured = {}
-    progress = []
+    chunk_path = tmp_path / "chunk-001.mp3"
+    chunk_path.write_bytes(b"ID3fake-audio")
+    requests: list[httpx.Request] = []
 
-    monkeypatch.setattr(transcription_service.settings, "TRANSCRIPTION_PROVIDER", "groq")
-    monkeypatch.setattr(transcription_service.settings, "GROQ_API_KEY", "test-key")
-    monkeypatch.setattr(
-        transcription_service.settings,
-        "GROQ_BASE_URL",
-        "https://api.groq.com/openai/v1",
+    def handler(request: httpx.Request) -> httpx.Response:
+        requests.append(request)
+        return httpx.Response(200, json={**VERBOSE, "usage": {"cost": 0.0045, "seconds": 600}})
+
+    client = OpenRouterClient(
+        api_key="sk-or-test",
+        base_url="https://openrouter.test/api/v1",
+        timeout_seconds=5,
+        transport=httpx.MockTransport(handler),
     )
-    monkeypatch.setattr(
-        transcription_service.settings,
-        "GROQ_TRANSCRIPTION_MODEL",
-        "whisper-large-v3-turbo",
-    )
-    monkeypatch.setattr(transcription_service.settings, "TRANSCRIPTION_TIMEOUT_SECONDS", 123)
-    monkeypatch.setattr(
-        transcription_service,
-        "_load_model",
-        lambda model_size: pytest.fail("local model should not load for Groq transcription"),
+    monkeypatch.setattr(transcription_service.settings, "TRANSCRIPTION_MODEL", "openai/whisper-large-v3")
+
+    segments = await transcribe_chunk(
+        AudioChunk(1, chunk_path, 600.0, 1200.0), language, client=client
     )
 
-    class FakeResponse:
-        text = "ok"
-
-        def raise_for_status(self) -> None:
-            return None
-
-        def json(self) -> dict:
-            return {
-                "segments": [
-                    {"start": 0.0, "end": 2.5, "text": " first ", "avg_logprob": -0.1},
-                    {"start": 2.5, "end": 5.0, "text": "second", "avg_logprob": -1.4},
-                ],
-            }
-
-    class FakeAsyncClient:
-        def __init__(self, timeout: int):
-            captured["timeout"] = timeout
-
-        async def __aenter__(self):
-            return self
-
-        async def __aexit__(self, *args) -> None:
-            return None
-
-        async def post(self, url: str, **kwargs) -> FakeResponse:
-            captured["url"] = url
-            captured["headers"] = kwargs["headers"]
-            captured["data"] = kwargs["data"]
-            captured["file_name"] = kwargs["files"]["file"][0]
-            return FakeResponse()
-
-    monkeypatch.setattr(transcription_service.httpx, "AsyncClient", FakeAsyncClient)
-
-    segments = await transcription_service.transcribe(
-        audio_path,
-        language="en",
-        progress_callback=lambda pct, message: progress.append((pct, message)),
-    )
-
-    assert captured["url"] == "https://api.groq.com/openai/v1/audio/transcriptions"
-    assert captured["headers"]["Authorization"] == "Bearer test-key"
-    assert captured["data"]["model"] == "whisper-large-v3-turbo"
-    assert captured["data"]["language"] == "en"
-    assert captured["file_name"] == "sample.mp3"
-    assert captured["timeout"] == 123
-    assert [segment.text for segment in segments] == ["first", "second"]
-    assert segments[0].confidence_score == Decimal("0.9")
-    assert segments[1].confidence_score == Decimal("0.0")
-    assert progress[0][0] == 20
-    assert progress[-1][0] == 95
-
-
-@pytest.mark.asyncio
-async def test_transcribe_with_groq_requires_api_key(monkeypatch, tmp_path: Path) -> None:
-    audio_path = tmp_path / "sample.mp3"
-    audio_path.write_bytes(b"fake audio")
-
-    monkeypatch.setattr(transcription_service.settings, "TRANSCRIPTION_PROVIDER", "groq")
-    monkeypatch.setattr(transcription_service.settings, "GROQ_API_KEY", "")
-
-    with pytest.raises(RuntimeError, match="GROQ_API_KEY"):
-        await transcription_service.transcribe(audio_path)
-
-
-def test_map_groq_transcription_falls_back_to_single_text_segment() -> None:
-    segments = transcription_service._map_groq_segments(
-        {"text": "complete transcript", "duration": 3.25}
-    )
-
-    assert len(segments) == 1
-    assert segments[0].text == "complete transcript"
-    assert segments[0].start_time_sec == Decimal("0")
-    assert segments[0].end_time_sec == Decimal("3.25")
+    body = requests[0].content.decode("latin-1")
+    assert 'name="model"\r\n\r\nopenai/whisper-large-v3\r\n' in body
+    assert 'filename="chunk-001.mp3"' in body
+    assert ('name="language"' in body) is (sent is not None)
+    assert [float(s.start_time_sec) for s in segments] == [600.0, 604.2]

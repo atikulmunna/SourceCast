@@ -67,9 +67,6 @@ class Settings(BaseSettings):
         if "upstash.io" in redis_url and redis_url.startswith("redis://"):
             raise ValueError("Upstash Redis requires a rediss:// TLS URL in production")
 
-        if self.TRANSCRIPTION_PROVIDER == "groq" and not self.GROQ_API_KEY:
-            raise ValueError("GROQ_API_KEY is required when TRANSCRIPTION_PROVIDER=groq")
-
         key = self.OPENROUTER_API_KEY.lower()
         if not key or any(marker in key for marker in PLACEHOLDER_SECRET_MARKERS):
             raise ValueError("OPENROUTER_API_KEY must be set in production")
@@ -130,21 +127,21 @@ class Settings(BaseSettings):
     CHAT_MAX_COMPLETION_PRICE: float = 2.0  # USD per million tokens; 0 means no cap
     # Fixed models: every vector in an index must come from the same model.
     EMBEDDING_MODEL: str = "openai/text-embedding-3-small"
-    TRANSCRIPTION_MODEL: str = "openai/whisper-large-v3"
+    # whisper-large-v3-turbo matched whisper-large-v3 on a one-hour talk (timestamps
+    # within 1.6 s of the captions at start, middle and end) at $0.012 per hour of
+    # audio against $0.027, and ran faster (2026-11-14).
+    TRANSCRIPTION_MODEL: str = "openai/whisper-large-v3-turbo"
     # Audio is split into chunks this long so each upload stays under OpenRouter's
     # 25 MB cap and 60 second upstream timeout (16 kHz mono, 32 kbit/s: ~2.4 MB).
     TRANSCRIPTION_CHUNK_MINUTES: int = 10
+    # Per chunk. OpenRouter's upstream gives up after 60 seconds.
+    TRANSCRIPTION_TIMEOUT_SECONDS: int = 120
 
     @property
     def chat_allowed_models(self) -> list[str]:
         return [item.strip() for item in self.CHAT_ALLOWED_MODELS.split(",") if item.strip()]
 
     # ── AI / RAG ──────────────────────────────────────────────────────────────
-    GROQ_API_KEY: str = ""
-    GROQ_BASE_URL: str = "https://api.groq.com/openai/v1"
-    TRANSCRIPTION_PROVIDER: Literal["local", "groq"] = "local"
-    GROQ_TRANSCRIPTION_MODEL: str = "whisper-large-v3-turbo"
-    TRANSCRIPTION_TIMEOUT_SECONDS: int = 300
     EMBEDDING_PROVIDER: Literal["sentence-transformers", "hash"] = "sentence-transformers"
     DEFAULT_EMBEDDING_MODEL: str = "all-MiniLM-L6-v2"
     DEFAULT_QDRANT_COLLECTION: str = "source_chunks_v1_minilm_384"
