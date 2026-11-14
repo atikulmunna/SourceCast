@@ -30,9 +30,7 @@ export interface KnowledgeSpace {
 export interface ProcessingEstimate {
   estimated_seconds: number;
   estimated_label: string;
-  model_used: string;
   is_long_content: boolean;
-  warning: string | null;
 }
 
 export interface SourcePreview {

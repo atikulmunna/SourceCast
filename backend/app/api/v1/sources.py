@@ -34,7 +34,7 @@ async def preview_source_url(
     Preview metadata for a source URL before ingestion.
     Returns title, creator, duration, thumbnail, and estimated processing time.
     """
-    return await preview_source(data.url, data.whisper_model)
+    return await preview_source(data.url)
 
 
 # ── Create / Ingest ────────────────────────────────────────────────────────────
@@ -56,7 +56,6 @@ async def create_source(
         user_id=current_user.id,
         url=data.url,
         space_id=data.space_id,
-        whisper_model=data.whisper_model,
         language=data.language,
         audio_storage_policy=data.audio_storage_policy,
     )

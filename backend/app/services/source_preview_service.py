@@ -131,15 +131,21 @@ def _extract_info(url: str) -> dict[str, Any]:
         return ydl.extract_info(url, download=False)
 
 
-async def preview_source(
-    url: str, whisper_model: str | None = None
-) -> SourcePreviewResponse:
+def estimate_processing_seconds(duration_sec: int) -> int:
+    """Rough end-to-end time for hosted transcription and indexing.
+
+    Measured on a one-hour talk: about a minute in total (audio prep 11 s,
+    transcription 32 s, plus download and indexing). YouTube sources with
+    captions are faster still.
+    """
+    return 30 + duration_sec // 60
+
+
+async def preview_source(url: str) -> SourcePreviewResponse:
     """
     Extract metadata from a URL using yt-dlp.
     Returns preview metadata including processing time estimate.
     """
-    model = whisper_model or settings.WHISPER_MODEL
-
     try:
         info = await asyncio.to_thread(_extract_info, url)
     except yt_dlp.utils.DownloadError as exc:
@@ -160,26 +166,11 @@ async def preview_source(
     # Build processing estimate
     estimate: ProcessingEstimate | None = None
     if duration_sec is not None:
-        est_sec = settings.estimate_transcription_seconds(duration_sec, model)
-        is_long = duration_sec >= LONG_CONTENT_THRESHOLD_SEC
-
-        warning: str | None = None
-        if is_long:
-            dur_label = _format_duration(duration_sec)
-            est_label = _format_estimate(est_sec)
-            warning = (
-                f"This source is {dur_label} long. "
-                f"CPU transcription may take {est_label} with the '{model}' model. "
-                f"Consider using 'base' or 'tiny' for a faster demo, "
-                f"or process a specific time range."
-            )
-
+        est_sec = estimate_processing_seconds(duration_sec)
         estimate = ProcessingEstimate(
             estimated_seconds=est_sec,
             estimated_label=_format_estimate(est_sec),
-            model_used=model,
-            is_long_content=is_long,
-            warning=warning,
+            is_long_content=duration_sec >= LONG_CONTENT_THRESHOLD_SEC,
         )
 
     # Parse publish date

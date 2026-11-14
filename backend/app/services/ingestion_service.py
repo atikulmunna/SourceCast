@@ -42,7 +42,6 @@ async def create_source_and_enqueue(
     user_id: uuid.UUID,
     url: str,
     space_id: uuid.UUID,
-    whisper_model: str | None = None,
     language: str | None = None,
     audio_storage_policy: str = "DELETE_AFTER_TRANSCRIPTION",
 ) -> tuple[Source, IngestionJob]:
@@ -68,7 +67,7 @@ async def create_source_and_enqueue(
         raise NotFoundException("Knowledge space not found or not owned by you")
 
     # ── Preview URL ───────────────────────────────────────────────────────────
-    preview = await preview_source(url, whisper_model)
+    preview = await preview_source(url)
     canonical_url = preview.canonical_url or url
 
     # ── Duplicate guard ───────────────────────────────────────────────────────

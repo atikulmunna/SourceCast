@@ -9,7 +9,6 @@ from pydantic import BaseModel, Field
 class SourceCreateRequest(BaseModel):
     url: str = Field(min_length=5, max_length=2048)
     space_id: uuid.UUID
-    whisper_model: str | None = None
     language: str | None = None
     audio_storage_policy: str = "DELETE_AFTER_TRANSCRIPTION"
 
@@ -51,18 +50,12 @@ class SourceIngestResponse(BaseModel):
 
 class SourcePreviewRequest(BaseModel):
     url: str = Field(min_length=5, max_length=2048)
-    whisper_model: str | None = Field(
-        default=None,
-        description="Whisper model to use for transcription. Affects time estimate.",
-    )
 
 
 class ProcessingEstimate(BaseModel):
     estimated_seconds: int
-    estimated_label: str  # e.g. "~12 min"
-    model_used: str
+    estimated_label: str  # e.g. "~2 min"
     is_long_content: bool
-    warning: str | None = None
 
 
 class SourcePreviewResponse(BaseModel):

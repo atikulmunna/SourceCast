@@ -83,7 +83,6 @@ def preview() -> SourcePreviewResponse:
         processing_estimate=ProcessingEstimate(
             estimated_seconds=360,
             estimated_label="~6 min",
-            model_used="base",
             is_long_content=False,
         ),
     )

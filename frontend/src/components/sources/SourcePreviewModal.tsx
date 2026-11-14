@@ -11,7 +11,6 @@ import {
   Clock,
   User,
   Calendar,
-  Info,
   Play,
 } from "lucide-react";
 import api from "@/lib/api";
@@ -248,23 +247,8 @@ export function SourcePreviewModal({
                         <p style={{ color: "var(--text-muted)" }}>
                           {preview.source_type === "youtube"
                             ? "YouTube captions are used first when available. Audio transcription runs only as a fallback."
-                            : "Audio transcription uses the configured speech-to-text provider."}
+                            : "The audio is transcribed with hosted speech-to-text."}
                         </p>
-                      </div>
-                    )}
-
-                    {/* Long content warning */}
-                    {preview.processing_estimate?.warning && (
-                      <div
-                        className="rounded-lg p-3 mb-3 text-xs flex items-start gap-2"
-                        style={{
-                          background: "rgba(217,119,6,0.08)",
-                          border: "1px solid rgba(217,119,6,0.25)",
-                          color: "#fbbf24",
-                        }}
-                      >
-                        <Info size={13} className="shrink-0 mt-0.5" />
-                        {preview.processing_estimate.warning}
                       </div>
                     )}
 

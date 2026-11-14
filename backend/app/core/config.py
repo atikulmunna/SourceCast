@@ -145,8 +145,7 @@ class Settings(BaseSettings):
     def chat_allowed_models(self) -> list[str]:
         return [item.strip() for item in self.CHAT_ALLOWED_MODELS.split(",") if item.strip()]
 
-    # ── AI / RAG ──────────────────────────────────────────────────────────────
-    WHISPER_MODEL: str = "tiny"
+    # ── YouTube and downloads ─────────────────────────────────────────────────
     YTDLP_COOKIES_FILE: str = ""
     YTDLP_PROXY_URL: str = ""
     YOUTUBE_TRANSCRIPT_LANGUAGES: str = "en,en-US,en-GB"
@@ -162,27 +161,6 @@ class Settings(BaseSettings):
     @property
     def cors_origins(self) -> list[str]:
         return [self.FRONTEND_URL]
-
-    # ── Processing time estimation ─────────────────────────────────────────────
-    # Approximate real-time factor per Whisper model on CPU.
-    # A factor of 8 means 1 second of audio takes ~8 seconds to transcribe.
-    WHISPER_RTF_FACTORS: dict[str, float] = {
-        "tiny": 3.0,
-        "base": 6.0,
-        "small": 10.0,
-        "medium": 20.0,
-        "large": 40.0,
-        "large-v2": 40.0,
-        "large-v3": 45.0,
-    }
-
-    def estimate_transcription_seconds(
-        self, duration_sec: int, model: str | None = None
-    ) -> int:
-        """Return estimated transcription wall-clock seconds for the given audio duration."""
-        model = model or self.WHISPER_MODEL
-        rtf = self.WHISPER_RTF_FACTORS.get(model, 8.0)
-        return int(duration_sec * rtf)
 
 
 settings = Settings()
