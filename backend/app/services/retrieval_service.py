@@ -22,37 +22,13 @@ Usage (from chat, comparison, brief endpoints):
 from __future__ import annotations
 
 import logging
-import re
 import uuid
 from dataclasses import dataclass
 from decimal import Decimal
 
-from app.core.config import settings
 from app.services import embedding_service, qdrant_service
 
 logger = logging.getLogger(__name__)
-
-TOKEN_PATTERN = re.compile(r"[a-z0-9]+(?:'[a-z0-9]+)?")
-QUERY_STOPWORDS = {
-    "a",
-    "an",
-    "and",
-    "are",
-    "about",
-    "does",
-    "for",
-    "in",
-    "is",
-    "of",
-    "say",
-    "says",
-    "source",
-    "that",
-    "the",
-    "this",
-    "what",
-    "who",
-}
 
 
 @dataclass
@@ -69,38 +45,6 @@ class RetrievalResult:
     source_title: str | None
 
 
-def _tokens(text: str) -> list[str]:
-    return TOKEN_PATTERN.findall(text.lower())
-
-
-def lexical_relevance_score(query: str, text: str) -> float:
-    """
-    Return a lexical confidence boost for hash embeddings.
-
-    Hash embeddings are intentionally lightweight for small hosted workers, but
-    their cosine scores can understate exact evidence matches in long chunks.
-    This boost rewards direct token and phrase matches without affecting the
-    sentence-transformers path.
-    """
-    query_tokens = [token for token in _tokens(query) if token not in QUERY_STOPWORDS]
-    if not query_tokens:
-        return 0.0
-
-    text_lower = text.lower()
-    phrase = " ".join(query_tokens)
-    if len(query_tokens) >= 2 and phrase in text_lower:
-        return 0.86
-
-    text_tokens = set(_tokens(text))
-    matched = sum(1 for token in query_tokens if token in text_tokens)
-    coverage = matched / len(query_tokens)
-    if coverage == 1.0 and len(query_tokens) >= 2:
-        return 0.78
-    if coverage >= 0.5:
-        return 0.52 + (coverage * 0.18)
-    return coverage * 0.5
-
-
 class RetrievalService:
     """
     Encapsulates all vector retrieval for a single authenticated user.
@@ -111,8 +55,8 @@ class RetrievalService:
         The authenticated user, injected automatically by every endpoint
         that instantiates this service. Never accept user_id from the client.
     collection_name : str, optional
-        Defaults to the active collection from config. Pass a custom name
-        during model migration.
+        Defaults to the collection of the configured embedding model. Pass a
+        custom name during model migration.
     """
 
     def __init__(
@@ -121,7 +65,7 @@ class RetrievalService:
         collection_name: str | None = None,
     ) -> None:
         self.user_id = user_id
-        self.collection_name = collection_name or settings.DEFAULT_QDRANT_COLLECTION
+        self.collection_name = collection_name or embedding_service.collection_name()
 
     async def search(
         self,
@@ -148,11 +92,8 @@ class RetrievalService:
         score_threshold :
             Minimum cosine similarity score.  Chunks below this are excluded.
         """
-        # 1. Embed the query (runs in executor, non-blocking)
-        query_vector = await embedding_service.embed_query(
-            query_text,
-            model_name=settings.DEFAULT_EMBEDDING_MODEL,
-        )
+        # 1. Embed the query with the same model as the chunks
+        query_vector = await embedding_service.embed_query(query_text)
 
         # 2. Search Qdrant (user_id is ALWAYS injected here)
         scored_points = await qdrant_service.search(
@@ -170,27 +111,20 @@ class RetrievalService:
         for pt in scored_points:
             p = pt.payload or {}
             try:
-                text = p.get("text", "")
-                score = pt.score
-                if settings.EMBEDDING_PROVIDER == "hash":
-                    score = max(score, lexical_relevance_score(query_text, text))
                 results.append(
                     RetrievalResult(
                         chunk_id=uuid.UUID(p["chunk_id"]),
                         source_id=uuid.UUID(p["source_id"]),
                         space_id=uuid.UUID(p["space_id"]) if p.get("space_id") else None,
-                        score=score,
+                        score=pt.score,
                         start_time_sec=Decimal(str(p["start_time_sec"])),
                         end_time_sec=Decimal(str(p["end_time_sec"])),
-                        text=text,
+                        text=p.get("text", ""),
                         source_title=p.get("source_title"),
                     )
                 )
             except (KeyError, ValueError) as exc:
                 logger.warning("Skipping malformed Qdrant payload: %s (%s)", p, exc)
-
-        if settings.EMBEDDING_PROVIDER == "hash":
-            results.sort(key=lambda result: result.score, reverse=True)
 
         logger.debug(
             "RetrievalService[user=%s] query=%r → %d results",

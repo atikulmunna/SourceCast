@@ -4,7 +4,7 @@ from types import SimpleNamespace
 import pytest
 
 from app.api.v1.sources import delete_source
-from app.services import audio_service, qdrant_service
+from app.services import audio_service, source_vectors
 
 
 class Result:
@@ -49,16 +49,16 @@ async def test_delete_source_cleans_audio_vectors_and_database(
         deleted_audio.append(path)
         return True
 
-    async def fake_delete_vectors(collection, source_id):
-        deleted_vectors.append((collection, source_id))
+    async def fake_delete_vectors(db, source_id):
+        deleted_vectors.append(source_id)
 
     monkeypatch.setattr(audio_service, "delete_audio", fake_delete_audio)
-    monkeypatch.setattr(qdrant_service, "delete_by_source", fake_delete_vectors)
+    monkeypatch.setattr(source_vectors, "delete_source_vectors", fake_delete_vectors)
 
     await delete_source(source.id, SimpleNamespace(id=user_id), db)
 
     assert deleted_audio[0].parts[-2:] == ("tmp", "audio.mp3")
-    assert deleted_vectors[0][1] == source.id
+    assert deleted_vectors == [source.id]
     assert db.deleted == [source]
     assert db.commits == 1
 
@@ -71,10 +71,10 @@ async def test_delete_source_still_removes_database_row_when_vector_cleanup_fail
     source = SimpleNamespace(id=uuid.uuid4(), user_id=user_id, audio_file_url=None)
     db = FakeDB(source)
 
-    async def fail_vector_cleanup(collection, source_id):
+    async def fail_vector_cleanup(db, source_id):
         raise RuntimeError("Qdrant unavailable")
 
-    monkeypatch.setattr(qdrant_service, "delete_by_source", fail_vector_cleanup)
+    monkeypatch.setattr(source_vectors, "delete_source_vectors", fail_vector_cleanup)
 
     await delete_source(source.id, SimpleNamespace(id=user_id), db)
 

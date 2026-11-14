@@ -5,7 +5,6 @@ from types import SimpleNamespace
 
 import pytest
 
-from app.models.embedding_model import EmbeddingModel
 from app.models.ingestion_job import IngestionJob
 from app.models.source import Source
 from app.models.source_space import SourceSpace
@@ -67,16 +66,6 @@ class FakeDB:
             return Result(self.source)
         if entity is SourceSpace:
             return Result(SimpleNamespace(space_id=self.space_id))
-        if entity is EmbeddingModel:
-            return Result(
-                SimpleNamespace(
-                    id=uuid.uuid4(),
-                    name="all-MiniLM-L6-v2",
-                    qdrant_collection="source_chunks_v1_minilm_384",
-                    dimensions=384,
-                    distance_metric="Cosine",
-                )
-            )
         if entity is TranscriptChunk:
             return Result([value for value in self.added if isinstance(value, TranscriptChunk)])
         raise AssertionError(f"FakeDB got an unexpected statement: {statement}")
@@ -498,3 +487,45 @@ async def test_ingestion_worker_fails_when_transcription_finds_no_speech(
         await ingestion_tasks.ingest_source({}, str(job.id), str(source.id), str(source.user_id))
 
     assert job.status == "FAILED"
+
+
+@pytest.mark.asyncio
+async def test_ingestion_worker_indexes_into_the_configured_models_collection(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    source, job = source_and_job()
+    db = FakeDB(job, source, uuid.uuid4())
+    audio_path = tmp_path / "audio.mp3"
+    audio_path.write_bytes(b"audio")
+    ensured, upserted = [], []
+    segments = [
+        TranscriptSegmentData(
+            segment_index=0, start_time_sec=Decimal("0"), end_time_sec=Decimal("4"), text="Speech."
+        )
+    ]
+
+    from app.services import embedding_service, qdrant_service
+
+    monkeypatch.setattr(ingestion_tasks, "AsyncSessionLocal", lambda: db)
+    monkeypatch.setattr(
+        ingestion_tasks.audio_service, "download_audio", lambda *args: async_value(audio_path)
+    )
+    monkeypatch.setattr(ingestion_tasks.audio_service, "delete_audio", lambda path: async_value(True))
+    stub_transcription(monkeypatch, segments)
+    monkeypatch.setattr(ingestion_tasks.settings, "EMBEDDING_DIMENSIONS", 8)
+    monkeypatch.setattr(embedding_service, "collection_name", lambda: "source_chunks_test_8")
+    monkeypatch.setattr(embedding_service, "embed_texts", lambda texts: async_value([[0.1] * 8] * len(texts)))
+    monkeypatch.setattr(
+        qdrant_service, "ensure_collection", lambda *args: record_async(ensured, args, None)
+    )
+    monkeypatch.setattr(
+        qdrant_service, "upsert_points", lambda name, points: record_async(upserted, name, None)
+    )
+
+    await ingestion_tasks.ingest_source({}, str(job.id), str(source.id), str(source.user_id))
+
+    assert ensured == [("source_chunks_test_8", 8, "Cosine")]
+    assert upserted == ["source_chunks_test_8"]
+    chunks = [v for v in db.added if isinstance(v, TranscriptChunk)]
+    assert chunks and all(c.vector_collection == "source_chunks_test_8" for c in chunks)

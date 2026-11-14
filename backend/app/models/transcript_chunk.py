@@ -57,13 +57,8 @@ class TranscriptChunk(Base):
     token_count: Mapped[int | None] = mapped_column(Integer, nullable=True)
 
     # ── Vector metadata ──────────────────────────────────────────────────────
-    # FK to embedding_models; null until embedding stage runs
-    embedding_model_id: Mapped[uuid.UUID | None] = mapped_column(
-        UUID(as_uuid=True),
-        ForeignKey("embedding_models.id", ondelete="SET NULL"),
-        nullable=True,
-    )
-    # Qdrant collection this chunk's vector lives in
+    # Qdrant collection this chunk's vector lives in; the name encodes the
+    # embedding model and dimensions (see embedding_service.collection_name).
     vector_collection: Mapped[str] = mapped_column(String(160), nullable=False, default="")
     # Qdrant point ID, null until the embedding stage completes
     vector_point_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), nullable=True)
@@ -78,7 +73,6 @@ class TranscriptChunk(Base):
 
     # Relationships
     source: Mapped["Source"] = relationship("Source", back_populates="transcript_chunks")
-    embedding_model: Mapped["EmbeddingModel"] = relationship("EmbeddingModel")
 
     def __repr__(self) -> str:
         return (
@@ -87,5 +81,4 @@ class TranscriptChunk(Base):
         )
 
 
-from app.models.embedding_model import EmbeddingModel  # noqa: E402, F401
 from app.models.source import Source  # noqa: E402, F401

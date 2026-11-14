@@ -7,8 +7,8 @@ from app.services.grounded_answer_service import (
     GroundedAnswerService,
     NO_EVIDENCE_ANSWER,
     confidence_label,
+    SCORE_THRESHOLD,
     excerpt,
-    retrieval_score_threshold,
 )
 from app.services.retrieval_service import RetrievalResult
 
@@ -69,7 +69,7 @@ async def test_answer_builds_short_evidence_and_delegates_provider() -> None:
     assert response.insufficient_evidence is False
     assert len(response.evidence[0].excerpt) <= 500
     assert response.evidence[0].confidence_label == "High"
-    assert retrieval.calls[0]["score_threshold"] == 0.25
+    assert retrieval.calls[0]["score_threshold"] == SCORE_THRESHOLD
     assert "[E1] Source: Interview" in provider.calls[0][1]["content"]
 
 
@@ -92,27 +92,3 @@ def test_confidence_labels_and_excerpt_normalization() -> None:
     assert confidence_label(0.51) == "Low"
     assert excerpt("  short   excerpt  ") == "short excerpt"
     assert len(excerpt("word " * 200)) <= 500
-
-
-def test_hash_embedding_provider_uses_permissive_retrieval_threshold(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    from app.services import grounded_answer_service
-
-    monkeypatch.setattr(grounded_answer_service.settings, "EMBEDDING_PROVIDER", "hash")
-
-    assert retrieval_score_threshold() == 0.0
-
-
-def test_sentence_transformer_provider_keeps_evidence_threshold(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    from app.services import grounded_answer_service
-
-    monkeypatch.setattr(
-        grounded_answer_service.settings,
-        "EMBEDDING_PROVIDER",
-        "sentence-transformers",
-    )
-
-    assert retrieval_score_threshold() == 0.25

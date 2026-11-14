@@ -212,14 +212,14 @@ async def test_create_source_deletes_orphan_duplicate_before_reingesting(
     async def fake_pool(*args):
         return redis
 
-    async def fake_delete_by_source(collection_name, source_id):
-        deleted_vectors.append((collection_name, source_id))
+    async def fake_delete_vectors(db, source_id):
+        deleted_vectors.append(source_id)
 
     monkeypatch.setattr(ingestion_service, "preview_source", fake_preview)
     monkeypatch.setattr(ingestion_service, "create_pool", fake_pool)
     monkeypatch.setattr(
-        "app.services.qdrant_service.delete_by_source",
-        fake_delete_by_source,
+        "app.services.source_vectors.delete_source_vectors",
+        fake_delete_vectors,
     )
 
     new_source, job = await ingestion_service.create_source_and_enqueue(
@@ -230,7 +230,7 @@ async def test_create_source_deletes_orphan_duplicate_before_reingesting(
     )
 
     assert db.deleted == [orphan]
-    assert deleted_vectors[0][1] == orphan.id
+    assert deleted_vectors == [orphan.id]
     assert new_source is not orphan
     assert new_source.title == "Test audio"
     assert job.status == "QUEUED"

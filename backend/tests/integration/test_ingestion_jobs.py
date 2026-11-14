@@ -17,8 +17,8 @@ from sqlalchemy import delete, func, select, update
 from sqlalchemy.exc import IntegrityError
 
 from app.api.v1.jobs import cancel_job, get_job
+from app.core.config import settings
 from app.db.session import AsyncSessionLocal
-from app.models.embedding_model import EmbeddingModel
 from app.models.ingestion_job import IngestionJob
 from app.models.knowledge_space import KnowledgeSpace
 from app.models.source import Source
@@ -78,13 +78,6 @@ def _stub_chunked_transcription(monkeypatch: pytest.MonkeyPatch, transcribe_chun
     monkeypatch.setattr(ingestion_tasks.audio_prep_service, "prepare_audio", one_chunk)
     monkeypatch.setattr(ingestion_tasks.audio_prep_service, "delete_chunks", no_cleanup)
     monkeypatch.setattr(ingestion_tasks.transcription_service, "transcribe_chunk", transcribe_chunk)
-
-
-async def _active_embedding_model() -> EmbeddingModel:
-    async with AsyncSessionLocal() as db:
-        return await db.scalar(
-            select(EmbeddingModel).where(EmbeddingModel.is_active.is_(True)).limit(1)
-        )
 
 
 async def _output_counts(source_id: uuid.UUID, collection: str) -> tuple[int, int, int]:
@@ -179,8 +172,7 @@ async def test_retry_after_late_failure_replaces_earlier_outputs(
     tmp_path: Path,
 ) -> None:
     user_id, source_id, job_id = await _create_queued_job()
-    model = await _active_embedding_model()
-    collection = model.qdrant_collection
+    collection = embedding_service.collection_name()
     segments = _segments(3)
     expected_chunks = len(chunking_service.create_chunks(segments))
     audio_path = tmp_path / "audio.mp3"
@@ -192,8 +184,8 @@ async def test_retry_after_late_failure_replaces_earlier_outputs(
     async def fake_transcribe_chunk(*args, **kwargs):
         return segments
 
-    async def fake_embed(texts, model_name=None):
-        return [[1.0] + [0.0] * (model.dimensions - 1) for _ in texts]
+    async def fake_embed(texts, client=None):
+        return [[1.0] + [0.0] * (settings.EMBEDDING_DIMENSIONS - 1) for _ in texts]
 
     real_upsert = qdrant_service.upsert_points
     upserts = []
@@ -252,7 +244,7 @@ async def _cancel_via_api(job_id: uuid.UUID, user_id: uuid.UUID) -> int:
 @pytest.mark.asyncio
 async def test_job_cancelled_while_queued_never_runs(monkeypatch: pytest.MonkeyPatch) -> None:
     user_id, source_id, job_id = await _create_queued_job()
-    collection = (await _active_embedding_model()).qdrant_collection
+    collection = embedding_service.collection_name()
     downloads = []
 
     async def fake_download(source_url, job_uuid):

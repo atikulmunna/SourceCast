@@ -186,9 +186,9 @@ async def _delete_orphan_source(db: AsyncSession, source: Source) -> None:
             logger.warning("Audio cleanup failed for orphan source %s: %s", source.id, exc)
 
     try:
-        from app.services import qdrant_service
+        from app.services.source_vectors import delete_source_vectors
 
-        await qdrant_service.delete_by_source(settings.DEFAULT_QDRANT_COLLECTION, source.id)
+        await delete_source_vectors(db, source.id)
     except Exception as exc:
         logger.warning("Vector cleanup failed for orphan source %s: %s", source.id, exc)
 

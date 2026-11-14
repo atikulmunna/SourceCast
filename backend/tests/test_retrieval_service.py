@@ -4,7 +4,7 @@ from types import SimpleNamespace
 import pytest
 
 from app.services import retrieval_service
-from app.services.retrieval_service import RetrievalService, lexical_relevance_score
+from app.services.retrieval_service import RetrievalService
 
 
 @pytest.mark.asyncio
@@ -17,7 +17,7 @@ async def test_retrieval_service_injects_authenticated_user_and_maps_payload(
     space_id = uuid.uuid4()
     captured = {}
 
-    async def fake_embed_query(text: str, model_name: str):
+    async def fake_embed_query(text: str):
         assert text == "sleep quality"
         return [0.4, 0.5]
 
@@ -53,7 +53,7 @@ async def test_retrieval_service_injects_authenticated_user_and_maps_payload(
 async def test_retrieval_service_skips_malformed_payload(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    async def fake_embed_query(text: str, model_name: str):
+    async def fake_embed_query(text: str):
         return [0.4]
 
     async def fake_search(**kwargs):
@@ -68,81 +68,24 @@ async def test_retrieval_service_skips_malformed_payload(
 
 
 @pytest.mark.asyncio
-async def test_hash_retrieval_boosts_exact_name_matches(
+async def test_retrieval_searches_the_configured_models_collection(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    chunk_id = uuid.uuid4()
-    source_id = uuid.uuid4()
+    captured = {}
 
-    async def fake_embed_query(text: str, model_name: str):
+    async def fake_embed_query(text: str):
         return [0.4]
 
     async def fake_search(**kwargs):
-        return [
-            SimpleNamespace(
-                score=0.01,
-                payload={
-                    "chunk_id": str(chunk_id),
-                    "source_id": str(source_id),
-                    "space_id": None,
-                    "start_time_sec": 14,
-                    "end_time_sec": 25,
-                    "text": "Hi, I’m Kaye Heyer, NASA astronaut.",
-                    "source_title": "Launch audio",
-                },
-            )
-        ]
-
-    monkeypatch.setattr(retrieval_service.settings, "EMBEDDING_PROVIDER", "hash")
-    monkeypatch.setattr(retrieval_service.embedding_service, "embed_query", fake_embed_query)
-    monkeypatch.setattr(retrieval_service.qdrant_service, "search", fake_search)
-
-    results = await RetrievalService(user_id=uuid.uuid4()).search("who is kaye heyer")
-
-    assert results[0].score >= 0.72
-
-
-@pytest.mark.asyncio
-async def test_sentence_transformer_retrieval_keeps_vector_score(
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    chunk_id = uuid.uuid4()
-    source_id = uuid.uuid4()
-
-    async def fake_embed_query(text: str, model_name: str):
-        return [0.4]
-
-    async def fake_search(**kwargs):
-        return [
-            SimpleNamespace(
-                score=0.01,
-                payload={
-                    "chunk_id": str(chunk_id),
-                    "source_id": str(source_id),
-                    "space_id": None,
-                    "start_time_sec": 14,
-                    "end_time_sec": 25,
-                    "text": "Hi, I’m Kaye Heyer, NASA astronaut.",
-                    "source_title": "Launch audio",
-                },
-            )
-        ]
+        captured.update(kwargs)
+        return []
 
     monkeypatch.setattr(
-        retrieval_service.settings,
-        "EMBEDDING_PROVIDER",
-        "sentence-transformers",
+        retrieval_service.embedding_service, "collection_name", lambda: "source_chunks_test_8"
     )
     monkeypatch.setattr(retrieval_service.embedding_service, "embed_query", fake_embed_query)
     monkeypatch.setattr(retrieval_service.qdrant_service, "search", fake_search)
 
-    results = await RetrievalService(user_id=uuid.uuid4()).search("who is kaye heyer")
+    await RetrievalService(user_id=uuid.uuid4()).search("question")
 
-    assert results[0].score == 0.01
-
-
-def test_lexical_relevance_scores_direct_phrase_matches() -> None:
-    assert lexical_relevance_score(
-        "who is kaye heyer",
-        "Hi, I’m Kaye Heyer, NASA astronaut.",
-    ) >= 0.72
+    assert captured["collection_name"] == "source_chunks_test_8"

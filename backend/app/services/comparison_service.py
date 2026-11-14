@@ -6,7 +6,7 @@ from dataclasses import dataclass
 from app.schemas.comparison import ComparisonResponse, SourceComparison
 from app.schemas.qa import EvidenceHit
 from app.services.comparison_prompt_service import build_comparison_messages
-from app.services.grounded_answer_service import confidence_label, excerpt
+from app.services.grounded_answer_service import SCORE_THRESHOLD, confidence_label, excerpt
 from app.services.llm_provider import AnswerProvider, get_answer_provider
 from app.services.retrieval_service import RetrievalService
 
@@ -45,7 +45,7 @@ class ComparisonService:
                 query_text=topic,
                 source_ids=[source.id],
                 limit=limit_per_source,
-                score_threshold=0.25,
+                score_threshold=SCORE_THRESHOLD,
             )
             evidence = [
                 EvidenceHit(

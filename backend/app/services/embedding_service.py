@@ -1,123 +1,60 @@
-"""
-Embedding service using sentence-transformers or a lightweight hash provider.
+"""Embeddings through OpenRouter.
 
-Loads the configured embedding model once (LRU-cached) and exposes both
-a synchronous and an async interface. The sync variant runs in the default
-thread-pool executor so it never blocks the event loop.
-
-Default model: sentence-transformers/all-MiniLM-L6-v2 (384 dims, Cosine)
+One fixed model (EMBEDDING_MODEL, EMBEDDING_DIMENSIONS) produces every vector,
+because chunks and queries are only comparable when the same model embedded
+them. The Qdrant collection is named after the model and its dimensions by
+`collection_name`, the one place that names it, so switching models starts a
+fresh collection instead of mixing incompatible vectors.
 """
 
 from __future__ import annotations
 
-import asyncio
-import hashlib
-import logging
-from functools import lru_cache
-import math
 import re
 
 from app.core.config import settings
+from app.core.exceptions import UpstreamServiceException
+from app.services.openrouter_client import OpenRouterClient, get_openrouter_client
 
-logger = logging.getLogger(__name__)
-
-DEFAULT_MODEL = "all-MiniLM-L6-v2"
-BATCH_SIZE = 32
-HASH_DIMENSIONS = 384
-TOKEN_PATTERN = re.compile(r"[a-z0-9]+(?:'[a-z0-9]+)?")
+EMBED_BATCH_SIZE = 64
 
 
-def _token_features(text: str) -> list[str]:
-    tokens = TOKEN_PATTERN.findall(text.lower())
-    bigrams = [f"{left}_{right}" for left, right in zip(tokens, tokens[1:])]
-    return tokens + bigrams
-
-
-def _hash_embedding(text: str, dimensions: int = HASH_DIMENSIONS) -> list[float]:
-    vector = [0.0] * dimensions
-    features = _token_features(text)
-    if not features:
-        vector[0] = 1.0
-        return vector
-
-    for feature in features:
-        digest = hashlib.blake2b(feature.encode("utf-8"), digest_size=8).digest()
-        bucket = int.from_bytes(digest[:4], "big") % dimensions
-        sign = 1.0 if digest[4] & 1 else -1.0
-        vector[bucket] += sign
-
-    norm = math.sqrt(sum(value * value for value in vector))
-    if norm == 0:
-        vector[0] = 1.0
-        return vector
-    return [value / norm for value in vector]
-
-
-@lru_cache(maxsize=2)
-def _load_model(model_name: str):
-    """
-    Load and cache a SentenceTransformer model.
-    First call downloads the model from HuggingFace Hub (~90 MB for MiniLM).
-    """
-    try:
-        from sentence_transformers import SentenceTransformer
-    except ImportError as exc:
-        raise RuntimeError(
-            "Sentence-transformer embeddings require the optional local ML dependencies. "
-            'Install them with `pip install -e ".[local-ml]"` or set EMBEDDING_PROVIDER=hash.'
-        ) from exc
-
-    logger.info(
-        "Loading sentence-transformers model '%s' (first run may download)…",
-        model_name,
-    )
-    model = SentenceTransformer(model_name)
-    logger.info(
-        "Model '%s' ready, embedding dim: %d", model_name, model.get_sentence_embedding_dimension()
-    )
-    return model
-
-
-def embed_texts_sync(
-    texts: list[str],
-    model_name: str = DEFAULT_MODEL,
-) -> list[list[float]]:
-    """
-    Synchronous embedding.  Returns a list of float vectors.
-    Runs in the caller's thread. Call embed_texts() from async code instead.
-    """
-    if not texts:
-        return []
-    if settings.EMBEDDING_PROVIDER == "hash":
-        return [_hash_embedding(text) for text in texts]
-
-    model = _load_model(model_name)
-    embeddings = model.encode(
-        texts,
-        batch_size=BATCH_SIZE,
-        show_progress_bar=False,
-        normalize_embeddings=True,  # unit vectors → cosine = dot product
-        convert_to_numpy=True,
-    )
-    return [vec.tolist() for vec in embeddings]
+def collection_name(model: str | None = None, dimensions: int | None = None) -> str:
+    """`mongodb/voyage-4-lite`, 1024 -> `source_chunks_voyage_4_lite_1024`."""
+    model = model or settings.EMBEDDING_MODEL
+    dimensions = dimensions or settings.EMBEDDING_DIMENSIONS
+    slug = re.sub(r"[^a-z0-9]+", "_", model.rsplit("/", 1)[-1].lower()).strip("_")
+    return f"source_chunks_{slug}_{dimensions}"
 
 
 async def embed_texts(
-    texts: list[str],
-    model_name: str = DEFAULT_MODEL,
+    texts: list[str], client: OpenRouterClient | None = None
 ) -> list[list[float]]:
-    """
-    Async wrapper: runs embedding in the default executor to avoid
-    blocking the event loop during CPU-intensive model inference.
-    """
-    loop = asyncio.get_event_loop()
-    return await loop.run_in_executor(None, lambda: embed_texts_sync(texts, model_name))
+    """Embed in batches, checking every vector has EMBEDDING_DIMENSIONS values."""
+    if not texts:
+        return []
+    client = client or get_openrouter_client()
+    model, dimensions = settings.EMBEDDING_MODEL, settings.EMBEDDING_DIMENSIONS
+    vectors: list[list[float]] = []
+    for offset in range(0, len(texts), EMBED_BATCH_SIZE):
+        batch = texts[offset : offset + EMBED_BATCH_SIZE]
+        result = await client.embeddings(model=model, inputs=batch)
+        rows = result.body.get("data")
+        if not isinstance(rows, list) or len(rows) != len(batch):
+            got = len(rows) if isinstance(rows, list) else 0
+            raise UpstreamServiceException(
+                f"OpenRouter embeddings failed: expected {len(batch)} vectors, got {got}"
+            )
+        for row in sorted(rows, key=lambda item: item.get("index", 0)):
+            vector = row.get("embedding")
+            if not isinstance(vector, list) or len(vector) != dimensions:
+                size = len(vector) if isinstance(vector, list) else 0
+                raise UpstreamServiceException(
+                    f"OpenRouter embeddings failed: {model} returned {size} dimensions, "
+                    f"expected {dimensions}; check EMBEDDING_DIMENSIONS"
+                )
+            vectors.append([float(value) for value in vector])
+    return vectors
 
 
-async def embed_query(
-    text: str,
-    model_name: str = DEFAULT_MODEL,
-) -> list[float]:
-    """Convenience method for embedding a single query string."""
-    vectors = await embed_texts([text], model_name)
-    return vectors[0]
+async def embed_query(text: str, client: OpenRouterClient | None = None) -> list[float]:
+    return (await embed_texts([text], client=client))[0]

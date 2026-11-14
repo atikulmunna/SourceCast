@@ -126,7 +126,11 @@ class Settings(BaseSettings):
     CHAT_MAX_PROMPT_PRICE: float = 0.5  # USD per million tokens; 0 means no cap
     CHAT_MAX_COMPLETION_PRICE: float = 2.0  # USD per million tokens; 0 means no cap
     # Fixed models: every vector in an index must come from the same model.
-    EMBEDDING_MODEL: str = "openai/text-embedding-3-small"
+    # voyage-4-lite found the expected moment in the top 5 for every eval question
+    # (text-embedding-3-small: 96%) at the same price, with the smallest vectors of
+    # the models tested (2026-11-14). Changing either value starts a new collection.
+    EMBEDDING_MODEL: str = "mongodb/voyage-4-lite"
+    EMBEDDING_DIMENSIONS: int = 1024
     # whisper-large-v3-turbo matched whisper-large-v3 on a one-hour talk (timestamps
     # within 1.6 s of the captions at start, middle and end) at $0.012 per hour of
     # audio against $0.027, and ran faster (2026-11-14).
@@ -142,9 +146,6 @@ class Settings(BaseSettings):
         return [item.strip() for item in self.CHAT_ALLOWED_MODELS.split(",") if item.strip()]
 
     # ── AI / RAG ──────────────────────────────────────────────────────────────
-    EMBEDDING_PROVIDER: Literal["sentence-transformers", "hash"] = "sentence-transformers"
-    DEFAULT_EMBEDDING_MODEL: str = "all-MiniLM-L6-v2"
-    DEFAULT_QDRANT_COLLECTION: str = "source_chunks_v1_minilm_384"
     WHISPER_MODEL: str = "tiny"
     YTDLP_COOKIES_FILE: str = ""
     YTDLP_PROXY_URL: str = ""

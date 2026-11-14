@@ -25,7 +25,6 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import settings
 from app.db.session import AsyncSessionLocal
-from app.models.embedding_model import EmbeddingModel
 from app.models.ingestion_job import IngestionJob
 from app.models.source import Source
 from app.models.source_space import SourceSpace
@@ -37,6 +36,7 @@ from app.services import (
     chunking_service,
     embedding_service,
     qdrant_service,
+    source_vectors,
     transcription_service,
     youtube_caption_service,
 )
@@ -198,29 +198,11 @@ async def _reset_source_outputs(db: AsyncSession, source: Source) -> None:
     (source_id, segment_index) unique constraint, and leftover vectors would show
     up twice in search results.
     """
-    recorded = await db.execute(
-        select(TranscriptChunk.vector_collection)
-        .where(TranscriptChunk.source_id == source.id)
-        .distinct()
-    )
-    chunk_collections = set(recorded.scalars().all())
-
+    recorded = await source_vectors.recorded_collections(db, source.id)
     # Vectors are only written after their chunk rows, so a source without chunks
     # has no vectors to clean up. This keeps fresh runs free of Qdrant calls.
-    if chunk_collections:
-        # A failure right after an upsert can leave vectors whose chunks never
-        # recorded a collection, so also clear the collections new vectors go to.
-        active_collection = await db.scalar(
-            select(EmbeddingModel.qdrant_collection)
-            .where(EmbeddingModel.is_active.is_(True))
-            .limit(1)
-        )
-        collections = chunk_collections | {settings.DEFAULT_QDRANT_COLLECTION}
-        if active_collection:
-            collections.add(active_collection)
-        for name in sorted(c for c in collections if c):
-            if await qdrant_service.collection_exists(name):
-                await qdrant_service.delete_by_source(name, source.id)
+    if recorded:
+        await source_vectors.delete_source_vectors(db, source.id, recorded=recorded)
 
     await db.execute(delete(TranscriptChunk).where(TranscriptChunk.source_id == source.id))
     await db.execute(delete(TranscriptSegment).where(TranscriptSegment.source_id == source.id))
@@ -395,16 +377,8 @@ async def _embed_and_index(run: _Run, chunk_count: int) -> None:
         current_step=f"Generating embeddings for {chunk_count} chunks…",
     )
 
-    em_result = await run.db.execute(
-        select(EmbeddingModel).where(EmbeddingModel.is_active.is_(True)).limit(1)
-    )
-    em = em_result.scalar_one_or_none()
-    model_name = em.name if em else "all-MiniLM-L6-v2"
-    collection_name = em.qdrant_collection if em else "source_chunks_v1_minilm_384"
-    dimensions = em.dimensions if em else 384
-    distance = em.distance_metric if em else "Cosine"
-
-    await qdrant_service.ensure_collection(collection_name, dimensions, distance)
+    collection_name = embedding_service.collection_name()
+    await qdrant_service.ensure_collection(collection_name, settings.EMBEDDING_DIMENSIONS, "Cosine")
 
     # Reload the chunks to get their database IDs, which double as point IDs.
     chunks_result = await run.db.execute(
@@ -414,8 +388,8 @@ async def _embed_and_index(run: _Run, chunk_count: int) -> None:
     )
     db_chunks = chunks_result.scalars().all()
 
-    vectors = await embedding_service.embed_texts(
-        [c.text for c in db_chunks], model_name=model_name
+    vectors = await _with_heartbeat(
+        run, embedding_service.embed_texts([c.text for c in db_chunks])
     )
     points = [
         qdrant_service.build_point(
@@ -446,7 +420,6 @@ async def _embed_and_index(run: _Run, chunk_count: int) -> None:
     for c in db_chunks:
         c.vector_point_id = c.id  # point ID == chunk ID
         c.vector_collection = collection_name
-        c.embedding_model_id = em.id if em else None
     await run.db.commit()
 
     run.source.indexing_status = "INDEXED"

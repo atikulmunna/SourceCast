@@ -124,10 +124,7 @@ async def delete_source(
     current_user: CurrentUser,
     db: DBDep,
 ) -> None:
-    """
-    Delete a source and all associated data (segments, chunks, audio).
-    Vector cleanup will be added in Phase 3.
-    """
+    """Delete a source and all associated data (segments, chunks, vectors, audio)."""
     from pathlib import Path
 
     from app.services.audio_service import delete_audio
@@ -143,10 +140,9 @@ async def delete_source(
 
     # Delete Qdrant vectors for this source (best-effort)
     try:
-        from app.core.config import settings
-        from app.services import qdrant_service
+        from app.services.source_vectors import delete_source_vectors
 
-        await qdrant_service.delete_by_source(settings.DEFAULT_QDRANT_COLLECTION, source.id)
+        await delete_source_vectors(db, source.id)
     except Exception as exc:
         logger.warning("Qdrant cleanup failed for source %s: %s", source_id, exc)
 
