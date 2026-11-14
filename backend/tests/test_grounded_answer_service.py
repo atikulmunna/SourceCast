@@ -87,8 +87,47 @@ async def test_answer_prompts_with_the_whole_chunk_not_the_display_excerpt() -> 
 
 
 def test_confidence_labels_and_excerpt_normalization() -> None:
-    assert confidence_label(0.72) == "High"
-    assert confidence_label(0.52) == "Medium"
-    assert confidence_label(0.51) == "Low"
+    assert confidence_label(0.60) == "High"
+    assert confidence_label(0.59) == "Medium"
+    assert confidence_label(0.50) == "Medium"
+    assert confidence_label(0.49) == "Low"
     assert excerpt("  short   excerpt  ") == "short excerpt"
     assert len(excerpt("word " * 200)) <= 500
+
+
+class MarkerProvider:
+    def __init__(self, answer):
+        self.answer = answer
+
+    async def generate(self, messages):
+        return self.answer
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "answer", ["INSUFFICIENT_EVIDENCE", " **INSUFFICIENT_EVIDENCE**\n", "`insufficient_evidence`."]
+)
+async def test_marker_answer_becomes_insufficient_evidence_without_citations(answer) -> None:
+    service = GroundedAnswerService(
+        uuid.uuid4(), retrieval=Retrieval([hit()]), provider=MarkerProvider(answer)
+    )
+
+    response = await service.answer("What did the guest say about Bitcoin?")
+
+    assert response.insufficient_evidence is True
+    assert response.answer == NO_EVIDENCE_ANSWER
+    assert response.evidence == []
+
+
+@pytest.mark.asyncio
+async def test_partial_answer_that_mentions_gaps_is_kept() -> None:
+    answer = "Rates go up [E1]. The evidence does not cover other tools."
+    service = GroundedAnswerService(
+        uuid.uuid4(), retrieval=Retrieval([hit()]), provider=MarkerProvider(answer)
+    )
+
+    response = await service.answer("What does the central bank do?")
+
+    assert response.insufficient_evidence is False
+    assert response.answer == answer
+    assert len(response.evidence) == 1

@@ -2,12 +2,16 @@ from __future__ import annotations
 
 from app.schemas.qa import EvidenceHit
 
-SYSTEM_PROMPT = """You are SourceCast, an evidence-first research assistant.
+# The model answers with only this token when the evidence does not answer the
+# question; the service turns it into the insufficient-evidence response.
+INSUFFICIENT_MARKER = "INSUFFICIENT_EVIDENCE"
+
+SYSTEM_PROMPT = f"""You are SourceCast, an evidence-first research assistant.
 Answer the user's question using only the transcript evidence provided.
 Every major factual statement must cite one or more evidence IDs such as [E1].
 Do not add facts from memory, general knowledge, or assumptions.
-If the evidence is insufficient, say so plainly.
-If evidence has Low confidence, qualify the answer as based on limited transcript evidence.
+If the evidence does not answer the question at all, reply with exactly {INSUFFICIENT_MARKER} and nothing else.
+If it answers only part of the question, answer that part and say what the evidence does not cover.
 For identity questions, attribute the claim to the transcript unless multiple strong evidence items establish it.
 Keep excerpts short and do not reproduce long transcript passages."""
 
@@ -23,7 +27,6 @@ def build_grounded_answer_messages(
         evidence_lines.append(
             f"[E{index}] Source: {title}\n"
             f"Timestamp: {item.start_time_sec}s-{item.end_time_sec}s\n"
-            f"Confidence: {item.confidence_label}\n"
             f"Transcript: {item.text or item.excerpt}"
         )
 

@@ -4,7 +4,7 @@ import uuid
 
 from app.schemas.qa import AskQuestionResponse, EvidenceHit
 from app.services.llm_provider import AnswerProvider, get_answer_provider
-from app.services.prompt_service import build_grounded_answer_messages
+from app.services.prompt_service import INSUFFICIENT_MARKER, build_grounded_answer_messages
 from app.services.retrieval_service import RetrievalService
 
 NO_EVIDENCE_ANSWER = (
@@ -12,13 +12,27 @@ NO_EVIDENCE_ANSWER = (
     "Try selecting more sources or asking a narrower question."
 )
 
+# Calibrated on the eval with voyage-4-lite (2026-11-14). Among top-5 results,
+# about 75% of chunks scoring 0.60 or more were the expected moment, about half
+# of chunks scoring 0.50 to 0.60, and few below 0.50.
+HIGH_CONFIDENCE = 0.60
+MEDIUM_CONFIDENCE = 0.50
+# Evidence below this cosine similarity is not shown to the model. The lowest
+# score of a relevant chunk in the eval was 0.30, so nothing relevant is lost.
+SCORE_THRESHOLD = 0.28
+
 
 def confidence_label(score: float) -> str:
-    if score >= 0.72:
+    if score >= HIGH_CONFIDENCE:
         return "High"
-    if score >= 0.52:
+    if score >= MEDIUM_CONFIDENCE:
         return "Medium"
     return "Low"
+
+
+def is_insufficient(answer: str) -> bool:
+    """True when the model replied with the insufficient-evidence marker."""
+    return answer.strip().strip("*`'\".").upper().startswith(INSUFFICIENT_MARKER)
 
 
 def excerpt(text: str, max_chars: int = 500) -> str:
@@ -27,9 +41,6 @@ def excerpt(text: str, max_chars: int = 500) -> str:
         return compact
     return compact[: max_chars - 3].rstrip() + "..."
 
-
-# Evidence below this cosine similarity is not shown to the model.
-SCORE_THRESHOLD = 0.25
 
 
 class GroundedAnswerService:
@@ -81,4 +92,9 @@ class GroundedAnswerService:
 
         messages = build_grounded_answer_messages(question, evidence)
         answer = await self.provider.generate(messages)
+        if is_insufficient(answer):
+            # Evidence the model judged irrelevant is not shown as support.
+            return AskQuestionResponse(
+                answer=NO_EVIDENCE_ANSWER, evidence=[], insufficient_evidence=True
+            )
         return AskQuestionResponse(answer=answer, evidence=evidence)

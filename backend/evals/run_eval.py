@@ -35,7 +35,12 @@ import numpy as np
 from app.core.config import settings
 from app.schemas.qa import EvidenceHit
 from app.services.chunking_service import create_chunks
-from app.services.grounded_answer_service import confidence_label, excerpt
+from app.services.grounded_answer_service import (
+    SCORE_THRESHOLD,
+    confidence_label,
+    excerpt,
+    is_insufficient,
+)
 from app.services.llm_provider import (
     AUTO_ROUTER,
     OpenRouterAnswerProvider,
@@ -263,7 +268,7 @@ async def answer_report(
         ]
         row: dict[str, Any] = {"id": q.id, "answerable": q.answerable, "evidence": len(evidence)}
         if not evidence:
-            row.update(answer="(no evidence above threshold)", refused=True, ids=[], cost=0.0)
+            row.update(answer="(no evidence above threshold)", refused=True, flagged=True, ids=[], cost=0.0)
             row.update(model="-", latency=0.0, valid=False, grounded=False)
         else:
             started = time.monotonic()
@@ -273,14 +278,16 @@ async def answer_report(
             spend.add(f"chat {config}", result.cost)
             answer = result.body["choices"][0]["message"].get("content") or ""
             ids = cited_ids(answer)
+            flagged = is_insufficient(answer)
             row.update(
+                flagged=flagged,
                 answer=answer.strip(),
                 model=result.model,
                 cost=result.cost or 0.0,
                 latency=time.monotonic() - started,
                 ids=ids,
                 valid=citations_valid(ids, len(evidence)),
-                refused=is_refusal(answer),
+                refused=flagged or is_refusal(answer),
                 grounded=q.answerable
                 and any(
                     overlaps(hits[i - 1][0].span, q.source, q.start, q.end)
@@ -288,9 +295,9 @@ async def answer_report(
                     if 1 <= i <= len(hits)
                 ),
             )
-        row["correct"] = (
-            (row["valid"] and not row["refused"]) if q.answerable else row["refused"]
-        )
+        # Answerable: cited answer, not the insufficient marker (a note on what the
+        # evidence does not cover is fine). Unanswerable: any refusal.
+        row["correct"] = (row["valid"] and not row["flagged"]) if q.answerable else row["refused"]
         rows.append(row)
 
     answerable = [r for r in rows if r["answerable"]]
@@ -307,6 +314,11 @@ async def answer_report(
         "correct_refusals": (
             sum(r["correct"] for r in unanswerable) / len(unanswerable) if unanswerable else None
         ),
+        # Refusals the app turns into insufficient_evidence (marker or no evidence).
+        "flagged_insufficient": (
+            sum(r["flagged"] for r in unanswerable) / len(unanswerable) if unanswerable else None
+        ),
+        "answerable_flagged": sum(r["flagged"] for r in answerable) / len(answerable),
         "mean_cost": statistics.mean(r["cost"] for r in called) if called else 0.0,
         "median_latency": statistics.median(r["latency"] for r in called) if called else 0.0,
         "models": models,
@@ -357,8 +369,9 @@ def markdown(
             "## Answers",
             "",
             "| Config | Evidence | Valid citations | Cites expected moment | Correct refusals "
-            "| Mean cost | Median latency | Models used |",
-            "|---|---|---|---|---|---|---|---|",
+            "| Flagged insufficient (unanswerable / answerable) | Mean cost | Median latency "
+            "| Models used |",
+            "|---|---|---|---|---|---|---|---|---|",
         ]
         for summary, _ in answers:
             used = ", ".join(f"`{m}` x{n}" for m, n in sorted(summary["models"].items()))
@@ -366,6 +379,7 @@ def markdown(
                 f"| `{summary['config']}` | {summary['evidence']} "
                 f"| {pct(summary['answered_with_valid_citations'])} "
                 f"| {pct(summary['cites_expected_moment'])} | {pct(summary['correct_refusals'])} "
+                f"| {pct(summary['flagged_insufficient'])} / {pct(summary['answerable_flagged'])} "
                 f"| ${summary['mean_cost']:.5f} | {summary['median_latency']:.1f}s | {used} |"
             )
         for summary, rows in answers:
@@ -389,7 +403,9 @@ async def main() -> None:
     parser.add_argument(
         "--excerpt-only", action="store_true", help="send 500-char excerpts (the old prompt)"
     )
-    parser.add_argument("--threshold", type=float, default=0.25, help="answer score threshold")
+    parser.add_argument(
+        "--threshold", type=float, default=SCORE_THRESHOLD, help="answer score threshold"
+    )
     parser.add_argument("--max-spend", type=float, default=0.50, help="abort above this many USD")
     args = parser.parse_args()
 
