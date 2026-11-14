@@ -27,6 +27,7 @@ from app.models.transcript_chunk import TranscriptChunk
 from app.models.transcript_segment import TranscriptSegment
 from app.models.user import User
 from app.services import chunking_service, embedding_service, qdrant_service
+from app.services.audio_prep_service import AudioChunk
 from app.services.transcription_service import TranscriptSegmentData
 from app.worker import ingestion_tasks
 
@@ -63,6 +64,20 @@ async def _delete_user(user_id: uuid.UUID) -> None:
     async with AsyncSessionLocal() as db:
         await db.execute(delete(User).where(User.id == user_id))
         await db.commit()
+
+
+def _stub_chunked_transcription(monkeypatch: pytest.MonkeyPatch, transcribe_chunk) -> None:
+    """One audio chunk, transcribed by `transcribe_chunk`; no ffmpeg or OpenRouter."""
+
+    async def one_chunk(audio_path, chunk_minutes):
+        return [AudioChunk(0, audio_path, 0.0, 600.0)]
+
+    async def no_cleanup(audio_path):
+        return None
+
+    monkeypatch.setattr(ingestion_tasks.audio_prep_service, "prepare_audio", one_chunk)
+    monkeypatch.setattr(ingestion_tasks.audio_prep_service, "delete_chunks", no_cleanup)
+    monkeypatch.setattr(ingestion_tasks.transcription_service, "transcribe_chunk", transcribe_chunk)
 
 
 async def _active_embedding_model() -> EmbeddingModel:
@@ -119,10 +134,9 @@ async def test_database_error_mid_run_still_marks_job_failed(
     async def fake_download(source_url, job_uuid):
         return audio_path
 
-    async def duplicate_segments(*args, **kwargs):
-        # Two segments with the same index violate uq_transcript_segments_source_index,
-        # so the segment commit fails inside Postgres. A retry over leftover
-        # segments fails the same way.
+    async def segment_without_text(*args, **kwargs):
+        # A segment without text violates the NOT NULL constraint, so the segment
+        # commit fails inside Postgres.
         return [
             TranscriptSegmentData(
                 segment_index=0,
@@ -131,15 +145,15 @@ async def test_database_error_mid_run_still_marks_job_failed(
                 text="First segment.",
             ),
             TranscriptSegmentData(
-                segment_index=0,
+                segment_index=1,
                 start_time_sec=Decimal("5"),
                 end_time_sec=Decimal("10"),
-                text="Second segment.",
+                text=None,
             ),
         ]
 
     monkeypatch.setattr(ingestion_tasks.audio_service, "download_audio", fake_download)
-    monkeypatch.setattr(ingestion_tasks.transcription_service, "transcribe", duplicate_segments)
+    _stub_chunked_transcription(monkeypatch, segment_without_text)
 
     try:
         # The original database error reaches arq, not a secondary session error.
@@ -175,7 +189,7 @@ async def test_retry_after_late_failure_replaces_earlier_outputs(
         audio_path.write_bytes(b"audio")
         return audio_path
 
-    async def fake_transcribe(*args, **kwargs):
+    async def fake_transcribe_chunk(*args, **kwargs):
         return segments
 
     async def fake_embed(texts, model_name=None):
@@ -193,7 +207,7 @@ async def test_retry_after_late_failure_replaces_earlier_outputs(
             raise RuntimeError("connection reset after upsert")
 
     monkeypatch.setattr(ingestion_tasks.audio_service, "download_audio", fake_download)
-    monkeypatch.setattr(ingestion_tasks.transcription_service, "transcribe", fake_transcribe)
+    _stub_chunked_transcription(monkeypatch, fake_transcribe_chunk)
     monkeypatch.setattr(embedding_service, "embed_texts", fake_embed)
     monkeypatch.setattr(qdrant_service, "upsert_points", upsert_then_drop_connection)
 
